@@ -42,8 +42,9 @@ jobs:
             - name: Build
               run: npm run build
 
+            # The "Version packages" pull request consumes the changesets.
             - name: Check for a changeset
-              if: github.event_name == 'pull_request'
+              if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
               run: npx changeset status --since=origin/${{ github.base_ref }}
 
     test:

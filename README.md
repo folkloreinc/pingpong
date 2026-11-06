@@ -36,6 +36,27 @@ Realtime updates (new comments, notifications, live scores, votes, progress bars
 | `@pingpong-io/client`       | JavaScript client                                            |
 | `folklore/laravel-pingpong` | Laravel broadcaster, in its own repository                   |
 
+## Releases
+
+All `@pingpong-io/*` packages share one version. They are versioned with [Changesets](https://changesets.dev) and published to npm by GitHub Actions with [trusted publishing](https://docs.npmjs.com/trusted-publishers): no npm token, and each version gets a provenance attestation. The Docker image of the same version follows.
+
+1. A pull request that changes a package comes with a changeset: `npx changeset`. CI fails without one.
+2. On every push to `main`, the [Release workflow](.github/workflows/release.yml) opens or updates the "Version packages" pull request, which bumps the versions and writes the changelogs.
+3. Before merging it, configure trusted publishing for the packages it publishes for the first time (below).
+4. Merging it runs the workflow again: it builds and publishes the packages, pushes the `<package>@<version>` tags, creates the GitHub releases, and pushes `ghcr.io/folkloreinc/pingpong:<version>`.
+
+Don't publish from a local machine.
+
+### Trusted publishing
+
+npm only accepts a publish from the Release workflow for packages that trust it. Configure a package once, with npm 11.15+, write access to the `@pingpong-io` organization and 2FA:
+
+```bash
+scripts/trust-packages.sh
+```
+
+Run on the "Version packages" branch with no argument, it configures the packages whose new version isn't on npm yet; it also takes package names. A new configuration expires if no publish succeeds with it within 2 days, so don't configure packages ahead of their release. A package that isn't configured fails to publish with `ENEEDAUTH` while the others go through: configure it and run the workflow again. The workflow file name (`release.yml`) is part of the trust: renaming it breaks publishing.
+
 ## License
 
 [MIT](LICENSE)

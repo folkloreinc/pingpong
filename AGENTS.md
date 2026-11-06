@@ -6,7 +6,7 @@ Pingpong is a self-hosted, multi-tenant realtime server built on Socket.IO: appl
 
 ## Status
 
-Pingpong is in phase 0. Read the plan and the decisions before writing code:
+Pingpong is in phase 1. Read the plan and the decisions before writing code:
 
 - **Plan:** [#1](https://github.com/folkloreinc/pingpong/issues/1). Each item becomes a sub-issue of #1 when work on it starts, and is checked when that sub-issue is closed.
 - **Protocol:** [`docs/protocol.md`](docs/protocol.md) and [`packages/protocol/schema/openapi.json`](packages/protocol/schema/openapi.json), the contract between Pingpong, applications and clients.
@@ -81,3 +81,4 @@ Running the server itself is in [`docs/running.md`](docs/running.md).
 - **Every change to a package comes with a changeset** (`npx changeset`) that says what changed for users.
 - Open a pull request to `main` with `Closes #<issue>` or `Part of #<issue>` and the checks you ran. CI checks formatting, lint, types, the build and the changeset, runs the tests on PostgreSQL with Redis and on SQLite, and builds and smoke-tests the Docker image. **Merge only when CI is green.**
 - A change to the protocol is its own pull request, reviewed before the code that implements it.
+- **Releases** go through the "Version packages" pull request and the Release workflow, with trusted publishing (see "Releases" in [`README.md`](README.md)). Never publish from a local machine.
