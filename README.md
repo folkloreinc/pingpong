@@ -4,7 +4,7 @@ Pingpong is a self-hosted, multi-tenant realtime server. Several applications sh
 
 It is built on [Socket.IO](https://socket.io), which handles the connections. Pingpong adds what a shared service needs on top of it: projects, channels authorized by the application, an HTTP API to publish, subscriber counts, and a Laravel broadcaster.
 
-> **Status: phase 0.** Nothing is published yet. The plan is tracked in [#1](https://github.com/folkloreinc/pingpong/issues/1), and the decisions are in [`docs/decisions/`](docs/decisions/README.md).
+> **Status: phase 1.** Nothing is published yet. The plan is tracked in [#1](https://github.com/folkloreinc/pingpong/issues/1). The protocol is in [`docs/protocol.md`](docs/protocol.md), running the server in [`docs/running.md`](docs/running.md), and the decisions in [`docs/decisions/`](docs/decisions/README.md).
 
 ## Why
 
