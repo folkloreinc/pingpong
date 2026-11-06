@@ -31,7 +31,7 @@ packages/
               validator, signatures
   server/     @pingpong-io/server: projects, Socket.IO, HTTP API, `pingpong` CLI
               (`@pingpong-io/server/testing` starts a server for tests)
-  client/     @pingpong-io/client: JavaScript client (empty)
+  client/     @pingpong-io/client: JavaScript client, for browsers and Node
 spikes/
   socket-io/  Phase 0 spike, private, not published
 docker/       Dockerfile, entry point and smoke test

@@ -3,7 +3,8 @@
     "compilerOptions": {
         "rootDir": "src",
         "outDir": "dist",
-        "customConditions": []
+        "customConditions": [],
+        "lib": ["ES2024", "DOM"]
     },
     "include": ["src"],
     "exclude": ["src/**/*.test.ts"]
