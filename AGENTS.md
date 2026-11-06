@@ -9,29 +9,32 @@ Pingpong is a self-hosted, multi-tenant realtime server built on Socket.IO: appl
 Pingpong is in phase 0. Read the plan and the decisions before writing code:
 
 - **Plan:** [#1](https://github.com/folkloreinc/pingpong/issues/1). Each item becomes a sub-issue of #1 when work on it starts, and is checked when that sub-issue is closed.
+- **Protocol:** [`docs/protocol.md`](docs/protocol.md) and [`packages/protocol/schema/openapi.json`](packages/protocol/schema/openapi.json), the contract between Pingpong, applications and clients.
 - **Decisions:** [`docs/decisions/`](docs/decisions/README.md). Follow them. Changing one means a new decision record that supersedes it.
 - **Spike:** [`spikes/socket-io/`](spikes/socket-io/README.md), what phase 0 checked in Socket.IO. Throwaway code: nothing imports it.
 
 ## Rules
 
-1. **Socket.IO handles the connections.** Don't reimplement what it does (transports, rooms, acknowledgements, recovery, adapters). Pingpong adds projects, channels, the HTTP API and counts ([0002](docs/decisions/0002-socket-io.md)).
-2. **Projects are isolated.** One Socket.IO namespace per project. Every room, message, log line and metric is scoped to a project ([0003](docs/decisions/0003-projects.md)).
-3. **Authorization stays in the application.** Private and presence channels need a signature of the socket id and the channel by the project's secret. Pingpong never calls the application to authorize a channel ([0004](docs/decisions/0004-channel-signatures.md)).
-4. **Recovery is an optimization.** A client that is not recovered after a reconnection subscribes again and reloads what it shows from the application ([0006](docs/decisions/0006-connection-state-recovery.md)).
-5. **Secure by default.** Secrets are encrypted at rest, signatures are compared in constant time, origins are checked, and messages have a size limit.
-6. **No hardcoded URLs or secrets.** They come from config and environment variables.
+1. **The protocol is the contract.** The HTTP API and the payloads of the Socket.IO events are defined in `@pingpong-io/protocol` before they are implemented. Version 1 (`/v1`) only changes additively.
+2. **Socket.IO handles the connections.** Don't reimplement what it does (transports, rooms, acknowledgements, recovery, adapters). Pingpong adds projects, channels, the HTTP API and counts ([0002](docs/decisions/0002-socket-io.md)).
+3. **Projects are isolated.** One Socket.IO namespace per project. Every room, message, log line and metric is scoped to a project ([0003](docs/decisions/0003-projects.md)).
+4. **Authorization stays in the application.** Private and presence channels need a signature of the socket id and the channel by the project's secret. Pingpong never calls the application to authorize a channel ([0004](docs/decisions/0004-channel-signatures.md)).
+5. **Recovery is an optimization.** A client that is not recovered after a reconnection subscribes again and reloads what it shows from the application ([0006](docs/decisions/0006-connection-state-recovery.md)).
+6. **Secure by default.** Secrets are encrypted at rest, signatures are compared in constant time, origins are checked, and messages have a size limit.
+7. **No hardcoded URLs or secrets.** They come from config and environment variables.
 
 ## Repository map
 
 ```
 packages/
-  protocol/   @pingpong-io/protocol: messages, HTTP API and their schemas (empty)
+  protocol/   @pingpong-io/protocol: OpenAPI document, schemas of the Socket.IO events, types,
+              validator, signatures
   server/     @pingpong-io/server: Socket.IO, HTTP API, `pingpong` CLI (empty)
   client/     @pingpong-io/client: JavaScript client (empty)
 spikes/
   socket-io/  Phase 0 spike, private, not published
 config/       Shared Vitest config
-docs/         Decisions
+docs/         Protocol and decisions
 ```
 
 ## Stack
@@ -53,6 +56,8 @@ npm run typecheck   # tsc in every package
 npm run build       # build every package
 npm run format      # Prettier
 npx changeset       # describe a change for the changelog
+
+npm run generate -w @pingpong-io/protocol   # after changing the OpenAPI document
 ```
 
 Tests that need Redis are skipped without `PINGPONG_TEST_REDIS_URL`, and required in CI:
