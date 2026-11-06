@@ -1,0 +1,349 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:pingpong:protocol:v1",
+    "title": "Pingpong protocol 1.0.0-draft",
+    "description": "Generated from openapi.json by `npm run generate`. Reference a definition with `urn:pingpong:protocol:v1#/$defs/<name>`.",
+    "$defs": {
+        "ProjectId": {
+            "description": "A project's id, also its namespace: `/projects/{project}`.",
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+        },
+        "PublicKey": {
+            "description": "A project's public key. Clients send it when they connect, and applications with every API request.",
+            "type": "string",
+            "pattern": "^pk_[A-Za-z0-9_-]{16,64}$"
+        },
+        "ChannelName": {
+            "description": "A channel. `private-…` and `presence-…` channels need a signature from the application; any other channel is public.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[A-Za-z0-9_\\-=@,.;:]+$"
+        },
+        "EventName": {
+            "description": "The name of an event: printable ASCII, without spaces. Laravel's default event names (`App\\\\Events\\\\CommentCreated`) fit.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[\\x21-\\x7E]+$"
+        },
+        "SocketId": {
+            "description": "The id of a Socket.IO socket, as the client reads it (`socket.id`). It stays the same when the socket is recovered.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "Origin": {
+            "description": "An origin clients may connect from: a scheme, a host and an optional port, without a path. `*.` before the host allows its subdomains, one level or more, but not the host itself.",
+            "type": "string",
+            "maxLength": 255,
+            "pattern": "^https?://(\\*\\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*(:[0-9]{1,5})?$"
+        },
+        "PublishRequest": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "channels",
+                "event"
+            ],
+            "properties": {
+                "channels": {
+                    "description": "The channels to send the message to. A socket subscribed to several of them receives it once per channel.",
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/ChannelName"
+                    }
+                },
+                "event": {
+                    "$ref": "#/$defs/EventName"
+                },
+                "data": {
+                    "description": "Any JSON value. The serialized message must fit in the project's limit (10 KB by default)."
+                },
+                "exceptSocketId": {
+                    "description": "A socket that must not receive the message: the one whose action caused it (Laravel's `toOthers()`).",
+                    "allOf": [
+                        {
+                            "$ref": "#/$defs/SocketId"
+                        }
+                    ]
+                }
+            }
+        },
+        "PublishBatchRequest": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "messages"
+            ],
+            "properties": {
+                "messages": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                        "$ref": "#/$defs/PublishRequest"
+                    }
+                }
+            }
+        },
+        "Channel": {
+            "type": "object",
+            "required": [
+                "channel",
+                "occupied",
+                "subscriptionCount"
+            ],
+            "properties": {
+                "channel": {
+                    "$ref": "#/$defs/ChannelName"
+                },
+                "occupied": {
+                    "description": "Whether at least one socket is subscribed.",
+                    "type": "boolean"
+                },
+                "subscriptionCount": {
+                    "description": "The number of sockets subscribed right now.",
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "Origins": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "origins"
+            ],
+            "properties": {
+                "origins": {
+                    "description": "Clients that send an `Origin` header must send one of these. A client without one (a native app, a server) is accepted on the key alone.",
+                    "type": "array",
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Origin"
+                    }
+                }
+            }
+        },
+        "Health": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "status": {
+                    "const": "ok"
+                }
+            }
+        },
+        "RequestSignature": {
+            "description": "The `Pingpong-Signature` header of an API request: `t=<unix time>,v1=<hex HMAC-SHA256>`. The HMAC is of `{t}.{method}.{path}.{sha256}` with the project's secret, where `method` is upper case, `path` is the request target as sent (path and query string, without the host), and `sha256` is the hex SHA-256 of the body (of an empty body for a `GET`). Several `v1` values can follow: the request is valid if one of them matches the current secret or, during the grace period after a rotation, the previous one.",
+            "type": "string",
+            "pattern": "^t=[0-9]+(,v1=[0-9a-f]{64})+$"
+        },
+        "ChannelSignature": {
+            "description": "What the application gives a client to join a private channel: the hex HMAC-SHA256 of `{socketId}:{channel}` with the project's secret. In PHP: `hash_hmac('sha256', \"$socketId:$channel\", $secret)`.",
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+        },
+        "SocketAuth": {
+            "description": "The `auth` of the Socket.IO handshake, on the namespace `/projects/{project}`.",
+            "type": "object",
+            "required": [
+                "key"
+            ],
+            "properties": {
+                "key": {
+                    "$ref": "#/$defs/PublicKey"
+                }
+            }
+        },
+        "SocketConnectError": {
+            "description": "The `message` of the `connect_error` a client receives when Pingpong refuses its connection. `unknown_project`, `invalid_key`, `origin_not_allowed` and `project_disabled` are final: the client stops reconnecting. `too_many_connections` is not: it retries.",
+            "type": "string",
+            "enum": [
+                "unknown_project",
+                "invalid_key",
+                "origin_not_allowed",
+                "project_disabled",
+                "too_many_connections"
+            ]
+        },
+        "SocketConnected": {
+            "description": "The `pingpong:connected` event, the first one a socket receives after each connection, recovered or not.",
+            "type": "object",
+            "required": [
+                "socketId",
+                "recovered"
+            ],
+            "properties": {
+                "socketId": {
+                    "$ref": "#/$defs/SocketId"
+                },
+                "recovered": {
+                    "description": "Whether the socket was recovered with its channels and what it missed. When it wasn't, the client subscribes again and reloads what it shows from the application.",
+                    "type": "boolean"
+                }
+            }
+        },
+        "SocketSubscribeRequest": {
+            "description": "The `subscribe` event, sent by the client with an acknowledgement.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "channel"
+            ],
+            "properties": {
+                "channel": {
+                    "$ref": "#/$defs/ChannelName"
+                },
+                "signature": {
+                    "$ref": "#/$defs/ChannelSignature"
+                }
+            }
+        },
+        "SocketSubscribeError": {
+            "type": "string",
+            "enum": [
+                "invalid_request",
+                "invalid_signature",
+                "unsupported_channel",
+                "too_many_channels"
+            ],
+            "description": "`unsupported_channel`: presence channels are not supported yet. `too_many_channels`: the socket reached its limit of channels."
+        },
+        "SocketSubscribeResult": {
+            "description": "The acknowledgement of `subscribe`.",
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": [
+                        "ok",
+                        "subscriptionCount"
+                    ],
+                    "properties": {
+                        "ok": {
+                            "const": true
+                        },
+                        "subscriptionCount": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                },
+                {
+                    "type": "object",
+                    "required": [
+                        "ok",
+                        "error"
+                    ],
+                    "properties": {
+                        "ok": {
+                            "const": false
+                        },
+                        "error": {
+                            "$ref": "#/$defs/SocketSubscribeError"
+                        }
+                    }
+                }
+            ]
+        },
+        "SocketUnsubscribeRequest": {
+            "description": "The `unsubscribe` event, sent by the client with an acknowledgement (`{ \"ok\": true }`).",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "channel"
+            ],
+            "properties": {
+                "channel": {
+                    "$ref": "#/$defs/ChannelName"
+                }
+            }
+        },
+        "SocketMessage": {
+            "description": "The `message` event: a message published to a channel the socket is subscribed to.",
+            "type": "object",
+            "required": [
+                "channel",
+                "event"
+            ],
+            "properties": {
+                "channel": {
+                    "$ref": "#/$defs/ChannelName"
+                },
+                "event": {
+                    "$ref": "#/$defs/EventName"
+                },
+                "data": {
+                    "description": "The JSON value that was published, if any."
+                }
+            }
+        },
+        "SocketSubscriptionCount": {
+            "description": "The `pingpong:subscription_count` event: how many sockets are subscribed to a channel. Sent to its subscribers when the count changes, at most once every few seconds per channel.",
+            "type": "object",
+            "required": [
+                "channel",
+                "subscriptionCount"
+            ],
+            "properties": {
+                "channel": {
+                    "$ref": "#/$defs/ChannelName"
+                },
+                "subscriptionCount": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "Problem": {
+            "description": "Problem details (RFC 9457).",
+            "type": "object",
+            "required": [
+                "title",
+                "status"
+            ],
+            "properties": {
+                "type": {
+                    "description": "URI of the problem type. `about:blank` when the status says it all.",
+                    "type": "string",
+                    "format": "uri-reference",
+                    "default": "about:blank"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer",
+                    "minimum": 400,
+                    "maximum": 599
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "instance": {
+                    "type": "string",
+                    "format": "uri-reference"
+                },
+                "errors": {
+                    "description": "Validation errors: messages by JSON pointer to the invalid value in the request body (`/messages/3/channels/0`). The empty pointer is the body itself.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
