@@ -29,10 +29,12 @@ Pingpong is in phase 0. Read the plan and the decisions before writing code:
 packages/
   protocol/   @pingpong-io/protocol: OpenAPI document, schemas of the Socket.IO events, types,
               validator, signatures
-  server/     @pingpong-io/server: Socket.IO, HTTP API, `pingpong` CLI (empty)
+  server/     @pingpong-io/server: projects, Socket.IO, HTTP API, `pingpong` CLI
+              (`@pingpong-io/server/testing` starts a server for tests)
   client/     @pingpong-io/client: JavaScript client (empty)
 spikes/
   socket-io/  Phase 0 spike, private, not published
+docker/       Dockerfile, entry point and smoke test
 config/       Shared Vitest config
 docs/         Protocol and decisions
 ```
@@ -60,12 +62,16 @@ npx changeset       # describe a change for the changelog
 npm run generate -w @pingpong-io/protocol   # after changing the OpenAPI document
 ```
 
-Tests that need Redis are skipped without `PINGPONG_TEST_REDIS_URL`, and required in CI:
+The server's tests run on SQLite in memory, or on the PostgreSQL database in `PINGPONG_TEST_DATABASE_URL` (emptied by the tests). Its test files run one after the other, since they share that database. Tests that need Redis are skipped without `PINGPONG_TEST_REDIS_URL`. CI runs them on PostgreSQL 16 with Redis, and on SQLite:
 
 ```bash
+docker run --rm -d -p 5432:5432 -e POSTGRES_USER=pingpong -e POSTGRES_PASSWORD=pingpong postgres:16
 docker run --rm -d -p 6379:6379 redis:8
-PINGPONG_TEST_REDIS_URL=redis://127.0.0.1:6379 npm test
+PINGPONG_TEST_DATABASE_URL=postgres://pingpong:pingpong@127.0.0.1:5432/pingpong \
+    PINGPONG_TEST_REDIS_URL=redis://127.0.0.1:6379 npm test
 ```
+
+Running the server itself is in [`docs/running.md`](docs/running.md).
 
 ## Workflow
 
@@ -73,5 +79,5 @@ PINGPONG_TEST_REDIS_URL=redis://127.0.0.1:6379 npm test
 - Branch from `main`: `feature/<issue>-<slug>`, `fix/…`, `docs/…`, `ci/…`, `refactor/…`, `chore/…`.
 - **Every change comes with tests.** A bug fix adds a regression test that fails without the fix.
 - **Every change to a package comes with a changeset** (`npx changeset`) that says what changed for users.
-- Open a pull request to `main` with `Closes #<issue>` or `Part of #<issue>` and the checks you ran. CI checks formatting, lint, types, the build and the changeset, and runs the tests with Redis. **Merge only when CI is green.**
+- Open a pull request to `main` with `Closes #<issue>` or `Part of #<issue>` and the checks you ran. CI checks formatting, lint, types, the build and the changeset, runs the tests on PostgreSQL with Redis and on SQLite, and builds and smoke-tests the Docker image. **Merge only when CI is green.**
 - A change to the protocol is its own pull request, reviewed before the code that implements it.

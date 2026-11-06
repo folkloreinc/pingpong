@@ -47,9 +47,22 @@ jobs:
               run: npx changeset status --since=origin/${{ github.base_ref }}
 
     test:
-        name: Test
+        name: Test on PostgreSQL 16, with Redis
         runs-on: ubuntu-24.04
         services:
+            postgres:
+                image: postgres:16
+                env:
+                    POSTGRES_USER: pingpong
+                    POSTGRES_PASSWORD: pingpong
+                    POSTGRES_DB: pingpong
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready --host 127.0.0.1 --username pingpong --dbname pingpong"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 30
             redis:
                 image: redis:8
                 ports:
@@ -60,7 +73,25 @@ jobs:
                     --health-timeout 5s
                     --health-retries 30
         env:
+            PINGPONG_TEST_DATABASE_URL: postgres://pingpong:pingpong@127.0.0.1:5432/pingpong
             PINGPONG_TEST_REDIS_URL: redis://127.0.0.1:6379
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: actions/setup-node@v7
+              with:
+                  node-version-file: .nvmrc
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Test
+              run: npm test
+
+    test-sqlite:
+        name: Test on SQLite
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v7
 
