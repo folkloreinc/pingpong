@@ -3,12 +3,19 @@ name: Docker image
 on:
     push:
         branches: [main]
-        tags: ['v*']
     # Every pull request, including those stacked on another branch.
     pull_request:
+    # The Release workflow calls it with the version it published: tags pushed by a workflow don't
+    # start other workflows.
+    workflow_call:
+        inputs:
+            version:
+                description: The version of @pingpong-io/server that was published
+                type: string
+                required: true
 
 concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
+    group: docker-${{ github.ref }}-${{ inputs.version || 'branch' }}
     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -40,9 +47,8 @@ jobs:
                   tags: |
                       type=ref,event=branch
                       type=ref,event=pr
-                      type=semver,pattern={{version}}
-                      type=semver,pattern={{major}}.{{minor}}
-                      type=semver,pattern={{major}}
+                      type=semver,pattern={{version}},value=${{ inputs.version }},enable=${{ inputs.version != '' }}
+                      type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }},enable=${{ inputs.version != '' }}
                       type=sha
 
             - name: Build
