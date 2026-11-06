@@ -1,0 +1,34 @@
+{
+    "name": "@pingpong-io/server",
+    "version": "0.0.0",
+    "description": "The Pingpong server: projects, channels, HTTP API and the pingpong CLI, on Socket.IO",
+    "type": "module",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/folkloreinc/pingpong.git",
+        "directory": "packages/server"
+    },
+    "engines": {
+        "node": ">=24"
+    },
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "@pingpong-io/source": "./src/index.ts",
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "typecheck": "tsc -p tsconfig.json"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}
