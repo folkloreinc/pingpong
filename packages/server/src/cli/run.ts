@@ -2,9 +2,9 @@ import { parseArgs } from 'node:util';
 import type { ParseArgsOptionsConfig } from 'node:util';
 import { createClient } from 'redis';
 
+import { runChecks } from '../checks.ts';
 import { ConfigError, loadConfig, requireSecretKey } from '../config.ts';
 import type { Config, Limits } from '../config.ts';
-import { decryptSecret } from '../crypto.ts';
 import { createDatabase } from '../database/connection.ts';
 import type { Database } from '../database/connection.ts';
 import { migrateToLatest, pendingMigrations } from '../database/migrate.ts';
@@ -140,6 +140,13 @@ function toJson(project: Project): Record<string, unknown> {
     const { secrets: _secrets, ...rest } = project;
     return rest;
 }
+
+const CHECK_LABELS: Record<string, string> = {
+    database: 'database',
+    migrations: 'migrations',
+    secretKey: 'secret key',
+    redis: 'Redis',
+};
 
 const COMMANDS: Record<string, Command> = {
     serve: {
@@ -293,63 +300,35 @@ const COMMANDS: Record<string, Command> = {
         description:
             'Check the configuration, the database, the migrations, the secret key and Redis.',
         async run({ io, config }) {
-            let healthy = true;
-            const report = (ok: boolean, message: string) => {
-                healthy &&= ok;
-                io.stdout(`${ok ? 'ok  ' : 'FAIL'}  ${message}\n`);
-            };
-            await withDatabase(config, async (database) => {
-                try {
-                    await database.ping();
-                    report(true, `database (${database.dialect})`);
-                } catch {
-                    report(false, "database: it doesn't answer");
-                    return;
+            const checks = await withDatabase(config, async (database) => {
+                if (config.redisUrl === undefined) {
+                    return runChecks({ database, secretKey: config.secretKey });
                 }
-                const pending = await pendingMigrations(database);
-                report(
-                    pending.length === 0,
-                    pending.length === 0
-                        ? 'migrations'
-                        : `migrations: ${pending.length} pending, run pingpong migrate`,
-                );
-                if (config.secretKey === undefined) {
-                    report(false, 'PINGPONG_SECRET_KEY is not set');
-                } else if (pending.length === 0) {
-                    const rows = await database.kysely
-                        .selectFrom('projects')
-                        .select(['id', 'secret'])
-                        .execute();
-                    const unreadable = rows.filter((row) => {
-                        try {
-                            decryptSecret(config.secretKey as Buffer, row.secret);
-                            return false;
-                        } catch {
-                            return true;
-                        }
-                    });
-                    report(
-                        unreadable.length === 0,
-                        unreadable.length === 0
-                            ? `secret key (${rows.length} project(s))`
-                            : `secret key: it can't decrypt the secrets of ${unreadable.map((row) => row.id).join(', ')}`,
-                    );
-                }
-            });
-            if (config.redisUrl === undefined) {
-                io.stdout('-     Redis: not configured, one server only\n');
-            } else {
                 const redis = createClient({ url: config.redisUrl });
+                // Without it, a Redis that doesn't answer is an unhandled error event.
+                redis.on('error', () => undefined);
                 try {
-                    await redis.connect();
-                    await redis.ping();
-                    report(true, 'Redis');
-                } catch {
-                    report(false, "Redis: it doesn't answer");
+                    return await runChecks({
+                        database,
+                        secretKey: config.secretKey,
+                        pingRedis: async () => {
+                            await redis.connect();
+                            await redis.ping();
+                        },
+                    });
                 } finally {
                     redis.destroy();
                 }
+            });
+            for (const check of checks) {
+                const label = CHECK_LABELS[check.name] ?? check.name;
+                io.stdout(
+                    check.status === 'ok'
+                        ? `ok    ${label}${check.detail === undefined ? '' : ` (${check.detail})`}\n`
+                        : `${check.status === 'failed' ? 'FAIL' : '-   '}  ${label}${check.detail === undefined ? '' : `: ${check.detail}`}\n`,
+                );
             }
+            const healthy = checks.every((check) => check.status !== 'failed');
             return healthy ? EXIT.ok : EXIT.failure;
         },
     },

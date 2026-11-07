@@ -21,6 +21,8 @@ export interface Config {
     projectCacheTtl: number;
     /** Limits of projects that don't set their own. */
     defaultLimits: Limits;
+    /** `PINGPONG_ADMIN_TOKEN`: the admin API (and the dashboard) exist only with it (decision 0009). */
+    adminToken: string | undefined;
     /** Whether to trust `X-Forwarded-*` headers from a reverse proxy. */
     trustProxy: boolean;
     logLevel: string;
@@ -59,6 +61,22 @@ function boolean(env: Env, name: string): boolean {
         return true;
     }
     throw new ConfigError(`${name} must be true or false.`);
+}
+
+/** The shortest admin token: 32 characters, such as `openssl rand -hex 32` gives 64 of. */
+export const MIN_ADMIN_TOKEN_LENGTH = 32;
+
+/** Reads `PINGPONG_ADMIN_TOKEN`: at least 32 characters, without spaces. */
+export function parseAdminToken(value: string | undefined): string | undefined {
+    if (value === undefined || value === '') {
+        return undefined;
+    }
+    if (value.length < MIN_ADMIN_TOKEN_LENGTH || /\s/.test(value)) {
+        throw new ConfigError(
+            `PINGPONG_ADMIN_TOKEN must be at least ${MIN_ADMIN_TOKEN_LENGTH} characters, without spaces (openssl rand -hex 32).`,
+        );
+    }
+    return value;
 }
 
 /** Reads `PINGPONG_SECRET_KEY`: 32 bytes, as 64 hex characters or in base64. */
@@ -100,6 +118,7 @@ export function loadConfig(env: Env): Config {
             maxMessageSize: integer(env, 'PINGPONG_MAX_MESSAGE_SIZE', 10_240, 64),
             maxChannelsPerSocket: integer(env, 'PINGPONG_MAX_CHANNELS_PER_SOCKET', 100, 1),
         },
+        adminToken: parseAdminToken(env['PINGPONG_ADMIN_TOKEN']),
         trustProxy: boolean(env, 'PINGPONG_TRUST_PROXY'),
         logLevel: env['PINGPONG_LOG_LEVEL'] || 'info',
     };
