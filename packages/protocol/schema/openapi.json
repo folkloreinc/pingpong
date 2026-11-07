@@ -645,6 +645,60 @@
                     }
                 }
             }
+        },
+        "/admin/v1/usage": {
+            "get": {
+                "operationId": "adminGetUsage",
+                "tags": ["Admin"],
+                "summary": "Read the usage of the projects",
+                "description": "What each project used, per UTC day, over the last `days` days, today included. Every server adds its counts to the day's row every minute, so today is up to a minute behind. The usage of a deleted project is kept, under its id (decision 0010).",
+                "security": [
+                    {
+                        "adminToken": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "days",
+                        "in": "query",
+                        "required": false,
+                        "description": "How many UTC days, today included.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 400,
+                            "default": 30
+                        }
+                    },
+                    {
+                        "name": "project",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this project's usage.",
+                        "schema": {
+                            "$ref": "#/components/schemas/ProjectId"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The usage, per project and day.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsageReport"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Invalid"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AdminUnauthorized"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -1421,6 +1475,83 @@
                         "description": "Channels with at least one subscriber right now, every project.",
                         "type": "integer",
                         "minimum": 0
+                    }
+                }
+            },
+            "UsageLine": {
+                "description": "What a project used on a UTC day, on every server.",
+                "type": "object",
+                "required": [
+                    "project",
+                    "day",
+                    "messages",
+                    "bytes",
+                    "connectionMinutes",
+                    "peakConnections",
+                    "connectionsRefused",
+                    "rateLimited"
+                ],
+                "properties": {
+                    "project": {
+                        "$ref": "#/components/schemas/ProjectId"
+                    },
+                    "day": {
+                        "description": "The UTC day.",
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "messages": {
+                        "description": "Messages published: one per channel of each publish request.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "bytes": {
+                        "description": "Bytes of the messages published, serialized.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "connectionMinutes": {
+                        "description": "The project's connected sockets, added up minute by minute: what it costs to keep them open.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "peakConnections": {
+                        "description": "The most sockets connected at once on one server. With several servers, not the peak of their sum.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "connectionsRefused": {
+                        "description": "Connections refused, for any reason.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "rateLimited": {
+                        "description": "Publish requests refused because the project reached its limit of messages per second.",
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "UsageReport": {
+                "type": "object",
+                "required": ["since", "until", "lines"],
+                "properties": {
+                    "since": {
+                        "description": "The first UTC day of the period.",
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "until": {
+                        "description": "The last UTC day of the period: today.",
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "lines": {
+                        "description": "One line per project and day with usage, by day then project. A day without usage has no line.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UsageLine"
+                        }
                     }
                 }
             },
