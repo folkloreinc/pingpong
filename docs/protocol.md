@@ -133,3 +133,51 @@ When the number of subscribers of a channel changes, its subscribers receive `pi
 Socket.IO reconnects by itself. After a short disconnection (two minutes by default), Pingpong recovers the socket ([0006](decisions/0006-connection-state-recovery.md)): same id, same channels, and the messages it missed, in order. `pingpong:connected` then says `"recovered": true`.
 
 When it says `"recovered": false`, the socket is new: the client subscribes to its channels again, with new signatures for private ones, and reloads what it shows from the application, since it may have missed messages. `@pingpong-io/client` does it.
+
+## The admin API
+
+`/admin/v1` is for the server's operators and its dashboard ([0009](decisions/0009-admin-api-and-dashboard.md)), not for applications. It exists only when the server has an admin token (`PINGPONG_ADMIN_TOKEN`), which requests send as a bearer token: `Authorization: Bearer <token>`. It does what the `pingpong projects` CLI does, and shows the server's live state.
+
+| Request                                               | What it does                                                                 |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `GET /admin/v1/status`                                | The server's version, the checks of `pingpong doctor`, connections, channels |
+| `GET /admin/v1/projects`                              | The projects                                                                 |
+| `POST /admin/v1/projects`                             | Create a project. The response has its secret, this once                     |
+| `GET /admin/v1/projects/{project}`                    | A project, without its secret                                                |
+| `PATCH /admin/v1/projects/{project}`                  | Change its name, origins, limits, or disable it                              |
+| `DELETE /admin/v1/projects/{project}`                 | Delete it                                                                    |
+| `POST /admin/v1/projects/{project}/rotate-secret`     | A new secret, this once. The previous one works for the grace period         |
+| `GET /admin/v1/projects/{project}/channels`           | Its channels and their subscribers, most subscribed first                    |
+| `GET /admin/v1/projects/{project}/channels/{channel}` | One channel                                                                  |
+
+Creating a project:
+
+```json
+{
+    "id": "my-app",
+    "name": "My app",
+    "origins": ["https://example.com", "https://*.example.com"],
+    "limits": { "maxConnections": 500 }
+}
+```
+
+Changing one: what the request has changes, the rest stays. `origins` replaces the list, and a limit set to `null` goes back to the server's default. Disabling a project, or deleting it, disconnects its sockets on every server.
+
+```json
+{ "origins": ["https://example.com"], "limits": { "maxConnections": null }, "disabled": true }
+```
+
+A project comes with `stats`: what the server that answers counted since it started. They are kept in memory, per server, like subscription counts:
+
+```json
+{
+    "since": "2026-11-06T20:00:00Z",
+    "connections": 412,
+    "peakConnections": 530,
+    "connectionsRefused": { "origin_not_allowed": 3 },
+    "channels": 87,
+    "messages": 15230,
+    "bytes": 2048311,
+    "rateLimited": 0
+}
+```

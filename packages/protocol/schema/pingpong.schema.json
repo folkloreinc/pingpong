@@ -304,6 +304,453 @@
                 }
             }
         },
+        "ProjectName": {
+            "description": "A project's name, for people.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+        },
+        "ProjectSecret": {
+            "description": "A project's secret. It signs API requests and private channels, and is never sent to clients.",
+            "type": "string",
+            "pattern": "^sk_[A-Za-z0-9_-]{16,128}$"
+        },
+        "Limits": {
+            "description": "A project's limits.",
+            "type": "object",
+            "required": [
+                "maxConnections",
+                "maxMessagesPerSecond",
+                "maxMessageSize",
+                "maxChannelsPerSocket"
+            ],
+            "properties": {
+                "maxConnections": {
+                    "description": "Sockets connected to the project at once, on one server.",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "maxMessagesPerSecond": {
+                    "description": "Messages the project may publish per second, one per channel.",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "maxMessageSize": {
+                    "description": "Bytes of a message, serialized.",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "maxChannelsPerSocket": {
+                    "description": "Channels one socket may subscribe to.",
+                    "type": "integer",
+                    "minimum": 1
+                }
+            }
+        },
+        "OwnLimits": {
+            "description": "The limits a project sets itself. The others are the server's defaults.",
+            "type": "object",
+            "properties": {
+                "maxConnections": {
+                    "description": "Sockets connected to the project at once, on one server.",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "maxMessagesPerSecond": {
+                    "description": "Messages the project may publish per second, one per channel.",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "maxMessageSize": {
+                    "description": "Bytes of a message, serialized.",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "maxChannelsPerSocket": {
+                    "description": "Channels one socket may subscribe to.",
+                    "type": "integer",
+                    "minimum": 1
+                }
+            }
+        },
+        "LimitsPatch": {
+            "description": "Limits to set. `null` goes back to the server's default.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "maxConnections": {
+                    "description": "Sockets connected to the project at once, on one server.",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": 1
+                },
+                "maxMessagesPerSecond": {
+                    "description": "Messages the project may publish per second, one per channel.",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": 1
+                },
+                "maxMessageSize": {
+                    "description": "Bytes of a message, serialized.",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": 1
+                },
+                "maxChannelsPerSocket": {
+                    "description": "Channels one socket may subscribe to.",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": 1
+                }
+            }
+        },
+        "ProjectStats": {
+            "description": "What the server that answers counted for the project since it started (`since`). Kept in memory: a restart starts them again.",
+            "type": "object",
+            "required": [
+                "since",
+                "connections",
+                "peakConnections",
+                "connectionsRefused",
+                "channels",
+                "messages",
+                "bytes",
+                "rateLimited"
+            ],
+            "properties": {
+                "since": {
+                    "description": "When the server started counting.",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "connections": {
+                    "description": "Sockets connected right now.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "peakConnections": {
+                    "description": "The most sockets connected at once.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "connectionsRefused": {
+                    "description": "Connections refused, by reason (`SocketConnectError`). A reason that never happened is left out.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                },
+                "channels": {
+                    "description": "Channels with at least one subscriber right now.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "messages": {
+                    "description": "Messages published: one per channel of each publish request.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "bytes": {
+                    "description": "Bytes of the messages published, serialized.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "rateLimited": {
+                    "description": "Publish requests refused because the project reached its limit of messages per second.",
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "AdminProject": {
+            "description": "A project, as its operators see it. Never with its secret.",
+            "type": "object",
+            "required": [
+                "id",
+                "name",
+                "key",
+                "disabled",
+                "origins",
+                "limits",
+                "ownLimits",
+                "previousSecretExpiresAt",
+                "createdAt",
+                "updatedAt",
+                "stats"
+            ],
+            "properties": {
+                "id": {
+                    "$ref": "#/$defs/ProjectId"
+                },
+                "name": {
+                    "$ref": "#/$defs/ProjectName"
+                },
+                "key": {
+                    "$ref": "#/$defs/PublicKey"
+                },
+                "disabled": {
+                    "description": "A disabled project refuses connections and API requests.",
+                    "type": "boolean"
+                },
+                "origins": {
+                    "description": "The origins clients may connect from. Empty: any client that has the key.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/Origin"
+                    }
+                },
+                "limits": {
+                    "description": "The limits that apply: the project's own, or the server's defaults.",
+                    "$ref": "#/$defs/Limits"
+                },
+                "ownLimits": {
+                    "$ref": "#/$defs/OwnLimits"
+                },
+                "previousSecretExpiresAt": {
+                    "description": "Until when the previous secret still works after a rotation. `null`: only the current one works.",
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "format": "date-time"
+                },
+                "createdAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "stats": {
+                    "$ref": "#/$defs/ProjectStats"
+                }
+            }
+        },
+        "AdminProjectList": {
+            "type": "object",
+            "required": [
+                "projects"
+            ],
+            "properties": {
+                "projects": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/AdminProject"
+                    }
+                }
+            }
+        },
+        "AdminProjectCreate": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "$ref": "#/$defs/ProjectId"
+                },
+                "name": {
+                    "description": "The id when left out.",
+                    "$ref": "#/$defs/ProjectName"
+                },
+                "origins": {
+                    "description": "The origins clients may connect from. None: any client that has the key.",
+                    "type": "array",
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Origin"
+                    }
+                },
+                "limits": {
+                    "$ref": "#/$defs/LimitsPatch"
+                },
+                "disabled": {
+                    "type": "boolean",
+                    "default": false
+                }
+            }
+        },
+        "AdminProjectCreated": {
+            "type": "object",
+            "required": [
+                "project",
+                "secret"
+            ],
+            "properties": {
+                "project": {
+                    "$ref": "#/$defs/AdminProject"
+                },
+                "secret": {
+                    "description": "Shown this once.",
+                    "$ref": "#/$defs/ProjectSecret"
+                }
+            }
+        },
+        "AdminProjectPatch": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+                "name": {
+                    "$ref": "#/$defs/ProjectName"
+                },
+                "origins": {
+                    "description": "Replaces the origins. Empty: any client that has the key.",
+                    "type": "array",
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/Origin"
+                    }
+                },
+                "limits": {
+                    "$ref": "#/$defs/LimitsPatch"
+                },
+                "disabled": {
+                    "description": "`true` disconnects the project's sockets and refuses new ones.",
+                    "type": "boolean"
+                }
+            }
+        },
+        "AdminSecretRotation": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "gracePeriod": {
+                    "description": "Seconds the previous secret stays valid. The server's `PINGPONG_SECRET_GRACE_PERIOD` when left out; `0` drops it now.",
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2592000
+                }
+            }
+        },
+        "AdminProjectSecret": {
+            "type": "object",
+            "required": [
+                "secret",
+                "previousSecretExpiresAt"
+            ],
+            "properties": {
+                "secret": {
+                    "description": "Shown this once.",
+                    "$ref": "#/$defs/ProjectSecret"
+                },
+                "previousSecretExpiresAt": {
+                    "description": "Until when the previous secret still works. `null`: it no longer works.",
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "format": "date-time"
+                }
+            }
+        },
+        "AdminChannelList": {
+            "type": "object",
+            "required": [
+                "channels",
+                "total"
+            ],
+            "properties": {
+                "channels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/Channel"
+                    }
+                },
+                "total": {
+                    "description": "How many channels match, before `limit`.",
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "ServerCheck": {
+            "description": "A check of `pingpong doctor`.",
+            "type": "object",
+            "required": [
+                "name",
+                "status"
+            ],
+            "properties": {
+                "name": {
+                    "description": "`database`, `migrations`, `secretKey` or `redis`. More can come.",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "`skipped`: not configured, such as Redis on one server.",
+                    "type": "string",
+                    "enum": [
+                        "ok",
+                        "failed",
+                        "skipped"
+                    ]
+                },
+                "detail": {
+                    "type": "string"
+                }
+            }
+        },
+        "ServerStatus": {
+            "description": "The state of the server that answers, for its operators.",
+            "type": "object",
+            "required": [
+                "version",
+                "startedAt",
+                "healthy",
+                "checks",
+                "projects",
+                "connections",
+                "channels"
+            ],
+            "properties": {
+                "version": {
+                    "description": "The server's version.",
+                    "type": "string"
+                },
+                "startedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "healthy": {
+                    "description": "Whether every check passes.",
+                    "type": "boolean"
+                },
+                "checks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/ServerCheck"
+                    }
+                },
+                "projects": {
+                    "description": "Projects in the database.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "connections": {
+                    "description": "Sockets connected right now, every project.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "channels": {
+                    "description": "Channels with at least one subscriber right now, every project.",
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
         "Problem": {
             "description": "Problem details (RFC 9457).",
             "type": "object",

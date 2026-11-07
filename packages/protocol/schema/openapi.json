@@ -4,7 +4,7 @@
         "title": "Pingpong",
         "version": "1.0.0-draft",
         "summary": "Publish messages to the channels of a project, and receive them over Socket.IO.",
-        "description": "The protocol between Pingpong, the applications that publish and the clients that subscribe.\n\nApplications use the HTTP API, signed with their project's secret. Clients connect over Socket.IO to their project's namespace, `/projects/{project}`, and use the events described by the `Socket*` schemas (see `docs/protocol.md`).\n\nVersion 1 (`/v1`) only changes additively: new fields, endpoints, events and enum values, never removed or renamed ones. Request bodies refuse unknown fields, so typos are caught. Responses and event payloads can gain fields: clients ignore the ones they don't know.\n\nErrors use `application/problem+json` (RFC 9457).",
+        "description": "The protocol between Pingpong, the applications that publish and the clients that subscribe.\n\nApplications use the HTTP API, signed with their project's secret. Clients connect over Socket.IO to their project's namespace, `/projects/{project}`, and use the events described by the `Socket*` schemas (see `docs/protocol.md`).\n\nVersion 1 (`/v1`) only changes additively: new fields, endpoints, events and enum values, never removed or renamed ones. Request bodies refuse unknown fields, so typos are caught. Responses and event payloads can gain fields: clients ignore the ones they don't know.\n\nThe admin API (`/admin/v1`) manages the projects and shows the server's live state, for its operators and its dashboard. It exists only when the server has an admin token (`PINGPONG_ADMIN_TOKEN`), sent as a bearer token; without one, its paths answer 404. Its responses are never cached (`Cache-Control: no-store`).\n\nErrors use `application/problem+json` (RFC 9457).",
         "license": {
             "name": "MIT",
             "identifier": "MIT"
@@ -26,6 +26,10 @@
         {
             "name": "Server",
             "description": "The server itself, without authentication."
+        },
+        {
+            "name": "Admin",
+            "description": "Projects and the server's live state, with the server's admin token."
         }
     ],
     "paths": {
@@ -261,6 +265,386 @@
                     }
                 }
             }
+        },
+        "/admin/v1/status": {
+            "get": {
+                "operationId": "adminGetStatus",
+                "tags": ["Admin"],
+                "summary": "Read the server's status",
+                "description": "The server's version, the checks of `pingpong doctor`, and its live connections and channels. Answers 200 even when a check fails: `healthy` says whether they all pass.",
+                "security": [
+                    {
+                        "adminToken": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The server's status.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ServerStatus"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AdminUnauthorized"
+                    }
+                }
+            }
+        },
+        "/admin/v1/projects": {
+            "get": {
+                "operationId": "adminListProjects",
+                "tags": ["Admin"],
+                "summary": "List the projects",
+                "security": [
+                    {
+                        "adminToken": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The projects, by id.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminProjectList"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AdminUnauthorized"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "adminCreateProject",
+                "tags": ["Admin"],
+                "summary": "Create a project",
+                "description": "Creates a project with a new key and a new secret. The secret is in this response only: put it in the application's environment.",
+                "security": [
+                    {
+                        "adminToken": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminProjectCreate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The project, and its secret. The secret is only in this response.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminProjectCreated"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Conflict"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Invalid"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AdminUnauthorized"
+                    }
+                }
+            }
+        },
+        "/admin/v1/projects/{project}": {
+            "parameters": [
+                {
+                    "name": "project",
+                    "in": "path",
+                    "required": true,
+                    "description": "The project's id.",
+                    "schema": {
+                        "$ref": "#/components/schemas/ProjectId"
+                    }
+                }
+            ],
+            "get": {
+                "operationId": "adminGetProject",
+                "tags": ["Admin"],
+                "summary": "Read a project",
+                "security": [
+                    {
+                        "adminToken": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The project, without its secret.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminProject"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AdminUnauthorized"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "adminUpdateProject",
+                "tags": ["Admin"],
+                "summary": "Change a project",
+                "description": "Changes what the request has, and leaves the rest. `origins` replaces the list. A limit set to `null` goes back to the server's default. Disabling a project disconnects its sockets, on every server, and refuses new ones.",
+                "security": [
+                    {
+                        "adminToken": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminProjectPatch"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The project.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminProject"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Invalid"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AdminUnauthorized"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "adminDeleteProject",
+                "tags": ["Admin"],
+                "summary": "Delete a project",
+                "description": "Deletes the project and disconnects its sockets, on every server. Its key and secret stop working.",
+                "security": [
+                    {
+                        "adminToken": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Deleted. Its sockets are disconnected."
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AdminUnauthorized"
+                    }
+                }
+            }
+        },
+        "/admin/v1/projects/{project}/rotate-secret": {
+            "parameters": [
+                {
+                    "name": "project",
+                    "in": "path",
+                    "required": true,
+                    "description": "The project's id.",
+                    "schema": {
+                        "$ref": "#/components/schemas/ProjectId"
+                    }
+                }
+            ],
+            "post": {
+                "operationId": "adminRotateProjectSecret",
+                "tags": ["Admin"],
+                "summary": "Rotate a project's secret",
+                "description": "Gives the project a new secret, for API requests and private channels. The previous one stays valid for the grace period, so the application can deploy the new one first. A second rotation within the grace period drops the secret before the current one.",
+                "security": [
+                    {
+                        "adminToken": []
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminSecretRotation"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The new secret. It is only in this response.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminProjectSecret"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Invalid"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AdminUnauthorized"
+                    }
+                }
+            }
+        },
+        "/admin/v1/projects/{project}/channels": {
+            "parameters": [
+                {
+                    "name": "project",
+                    "in": "path",
+                    "required": true,
+                    "description": "The project's id.",
+                    "schema": {
+                        "$ref": "#/components/schemas/ProjectId"
+                    }
+                }
+            ],
+            "get": {
+                "operationId": "adminListChannels",
+                "tags": ["Admin"],
+                "summary": "List a project's channels",
+                "description": "The channels that sockets of the server that answers are subscribed to, right now.",
+                "security": [
+                    {
+                        "adminToken": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "prefix",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only the channels whose name starts with it.",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 200
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "How many channels to return.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 500,
+                            "default": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The channels with at least one subscriber, most subscribed first.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminChannelList"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Invalid"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AdminUnauthorized"
+                    }
+                }
+            }
+        },
+        "/admin/v1/projects/{project}/channels/{channel}": {
+            "parameters": [
+                {
+                    "name": "project",
+                    "in": "path",
+                    "required": true,
+                    "description": "The project's id.",
+                    "schema": {
+                        "$ref": "#/components/schemas/ProjectId"
+                    }
+                },
+                {
+                    "name": "channel",
+                    "in": "path",
+                    "required": true,
+                    "description": "The channel, URL-encoded.",
+                    "schema": {
+                        "$ref": "#/components/schemas/ChannelName"
+                    }
+                }
+            ],
+            "get": {
+                "operationId": "adminGetChannel",
+                "tags": ["Admin"],
+                "summary": "Read a project's channel",
+                "description": "How many sockets of the server that answers are subscribed to the channel right now. A channel nobody is subscribed to is not occupied.",
+                "security": [
+                    {
+                        "adminToken": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The channel.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Channel"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Invalid"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AdminUnauthorized"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -269,13 +653,18 @@
                 "type": "apiKey",
                 "in": "header",
                 "name": "Pingpong-Key",
-                "description": "The project's public key (`pk_\u2026`). It says which project signed the request."
+                "description": "The project's public key (`pk_…`). It says which project signed the request."
             },
             "requestSignature": {
                 "type": "apiKey",
                 "in": "header",
                 "name": "Pingpong-Signature",
                 "description": "`t=<unix time>,v1=<hex HMAC-SHA256>`, the HMAC-SHA256 of `{t}.{method}.{path}.{sha256 of the body}` with the project's secret (see `RequestSignature`). Requests more than five minutes off are refused."
+            },
+            "adminToken": {
+                "type": "http",
+                "scheme": "bearer",
+                "description": "The server's admin token, `PINGPONG_ADMIN_TOKEN`: `Authorization: Bearer <token>`. Only for the admin API, never for `/v1`."
             }
         },
         "responses": {
@@ -327,6 +716,36 @@
                         }
                     }
                 }
+            },
+            "AdminUnauthorized": {
+                "description": "No admin token, or a wrong one.",
+                "content": {
+                    "application/problem+json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Problem"
+                        }
+                    }
+                }
+            },
+            "NotFound": {
+                "description": "No such project.",
+                "content": {
+                    "application/problem+json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Problem"
+                        }
+                    }
+                }
+            },
+            "Conflict": {
+                "description": "A project with this id already exists.",
+                "content": {
+                    "application/problem+json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Problem"
+                        }
+                    }
+                }
             }
         },
         "schemas": {
@@ -341,7 +760,7 @@
                 "pattern": "^pk_[A-Za-z0-9_-]{16,64}$"
             },
             "ChannelName": {
-                "description": "A channel. `private-\u2026` and `presence-\u2026` channels need a signature from the application; any other channel is public.",
+                "description": "A channel. `private-…` and `presence-…` channels need a signature from the application; any other channel is public.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 200,
@@ -591,6 +1010,415 @@
                         "$ref": "#/components/schemas/ChannelName"
                     },
                     "subscriptionCount": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "ProjectName": {
+                "description": "A project's name, for people.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+            },
+            "ProjectSecret": {
+                "description": "A project's secret. It signs API requests and private channels, and is never sent to clients.",
+                "type": "string",
+                "pattern": "^sk_[A-Za-z0-9_-]{16,128}$"
+            },
+            "Limits": {
+                "description": "A project's limits.",
+                "type": "object",
+                "required": [
+                    "maxConnections",
+                    "maxMessagesPerSecond",
+                    "maxMessageSize",
+                    "maxChannelsPerSocket"
+                ],
+                "properties": {
+                    "maxConnections": {
+                        "description": "Sockets connected to the project at once, on one server.",
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "maxMessagesPerSecond": {
+                        "description": "Messages the project may publish per second, one per channel.",
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "maxMessageSize": {
+                        "description": "Bytes of a message, serialized.",
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "maxChannelsPerSocket": {
+                        "description": "Channels one socket may subscribe to.",
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                }
+            },
+            "OwnLimits": {
+                "description": "The limits a project sets itself. The others are the server's defaults.",
+                "type": "object",
+                "properties": {
+                    "maxConnections": {
+                        "description": "Sockets connected to the project at once, on one server.",
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "maxMessagesPerSecond": {
+                        "description": "Messages the project may publish per second, one per channel.",
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "maxMessageSize": {
+                        "description": "Bytes of a message, serialized.",
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "maxChannelsPerSocket": {
+                        "description": "Channels one socket may subscribe to.",
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                }
+            },
+            "LimitsPatch": {
+                "description": "Limits to set. `null` goes back to the server's default.",
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "maxConnections": {
+                        "description": "Sockets connected to the project at once, on one server.",
+                        "type": ["integer", "null"],
+                        "minimum": 1
+                    },
+                    "maxMessagesPerSecond": {
+                        "description": "Messages the project may publish per second, one per channel.",
+                        "type": ["integer", "null"],
+                        "minimum": 1
+                    },
+                    "maxMessageSize": {
+                        "description": "Bytes of a message, serialized.",
+                        "type": ["integer", "null"],
+                        "minimum": 1
+                    },
+                    "maxChannelsPerSocket": {
+                        "description": "Channels one socket may subscribe to.",
+                        "type": ["integer", "null"],
+                        "minimum": 1
+                    }
+                }
+            },
+            "ProjectStats": {
+                "description": "What the server that answers counted for the project since it started (`since`). Kept in memory: a restart starts them again.",
+                "type": "object",
+                "required": [
+                    "since",
+                    "connections",
+                    "peakConnections",
+                    "connectionsRefused",
+                    "channels",
+                    "messages",
+                    "bytes",
+                    "rateLimited"
+                ],
+                "properties": {
+                    "since": {
+                        "description": "When the server started counting.",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "connections": {
+                        "description": "Sockets connected right now.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "peakConnections": {
+                        "description": "The most sockets connected at once.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "connectionsRefused": {
+                        "description": "Connections refused, by reason (`SocketConnectError`). A reason that never happened is left out.",
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    },
+                    "channels": {
+                        "description": "Channels with at least one subscriber right now.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "messages": {
+                        "description": "Messages published: one per channel of each publish request.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "bytes": {
+                        "description": "Bytes of the messages published, serialized.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "rateLimited": {
+                        "description": "Publish requests refused because the project reached its limit of messages per second.",
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "AdminProject": {
+                "description": "A project, as its operators see it. Never with its secret.",
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "key",
+                    "disabled",
+                    "origins",
+                    "limits",
+                    "ownLimits",
+                    "previousSecretExpiresAt",
+                    "createdAt",
+                    "updatedAt",
+                    "stats"
+                ],
+                "properties": {
+                    "id": {
+                        "$ref": "#/components/schemas/ProjectId"
+                    },
+                    "name": {
+                        "$ref": "#/components/schemas/ProjectName"
+                    },
+                    "key": {
+                        "$ref": "#/components/schemas/PublicKey"
+                    },
+                    "disabled": {
+                        "description": "A disabled project refuses connections and API requests.",
+                        "type": "boolean"
+                    },
+                    "origins": {
+                        "description": "The origins clients may connect from. Empty: any client that has the key.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Origin"
+                        }
+                    },
+                    "limits": {
+                        "description": "The limits that apply: the project's own, or the server's defaults.",
+                        "$ref": "#/components/schemas/Limits"
+                    },
+                    "ownLimits": {
+                        "$ref": "#/components/schemas/OwnLimits"
+                    },
+                    "previousSecretExpiresAt": {
+                        "description": "Until when the previous secret still works after a rotation. `null`: only the current one works.",
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "stats": {
+                        "$ref": "#/components/schemas/ProjectStats"
+                    }
+                }
+            },
+            "AdminProjectList": {
+                "type": "object",
+                "required": ["projects"],
+                "properties": {
+                    "projects": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AdminProject"
+                        }
+                    }
+                }
+            },
+            "AdminProjectCreate": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id"],
+                "properties": {
+                    "id": {
+                        "$ref": "#/components/schemas/ProjectId"
+                    },
+                    "name": {
+                        "description": "The id when left out.",
+                        "$ref": "#/components/schemas/ProjectName"
+                    },
+                    "origins": {
+                        "description": "The origins clients may connect from. None: any client that has the key.",
+                        "type": "array",
+                        "maxItems": 100,
+                        "uniqueItems": true,
+                        "items": {
+                            "$ref": "#/components/schemas/Origin"
+                        }
+                    },
+                    "limits": {
+                        "$ref": "#/components/schemas/LimitsPatch"
+                    },
+                    "disabled": {
+                        "type": "boolean",
+                        "default": false
+                    }
+                }
+            },
+            "AdminProjectCreated": {
+                "type": "object",
+                "required": ["project", "secret"],
+                "properties": {
+                    "project": {
+                        "$ref": "#/components/schemas/AdminProject"
+                    },
+                    "secret": {
+                        "description": "Shown this once.",
+                        "$ref": "#/components/schemas/ProjectSecret"
+                    }
+                }
+            },
+            "AdminProjectPatch": {
+                "type": "object",
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                    "name": {
+                        "$ref": "#/components/schemas/ProjectName"
+                    },
+                    "origins": {
+                        "description": "Replaces the origins. Empty: any client that has the key.",
+                        "type": "array",
+                        "maxItems": 100,
+                        "uniqueItems": true,
+                        "items": {
+                            "$ref": "#/components/schemas/Origin"
+                        }
+                    },
+                    "limits": {
+                        "$ref": "#/components/schemas/LimitsPatch"
+                    },
+                    "disabled": {
+                        "description": "`true` disconnects the project's sockets and refuses new ones.",
+                        "type": "boolean"
+                    }
+                }
+            },
+            "AdminSecretRotation": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "gracePeriod": {
+                        "description": "Seconds the previous secret stays valid. The server's `PINGPONG_SECRET_GRACE_PERIOD` when left out; `0` drops it now.",
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2592000
+                    }
+                }
+            },
+            "AdminProjectSecret": {
+                "type": "object",
+                "required": ["secret", "previousSecretExpiresAt"],
+                "properties": {
+                    "secret": {
+                        "description": "Shown this once.",
+                        "$ref": "#/components/schemas/ProjectSecret"
+                    },
+                    "previousSecretExpiresAt": {
+                        "description": "Until when the previous secret still works. `null`: it no longer works.",
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    }
+                }
+            },
+            "AdminChannelList": {
+                "type": "object",
+                "required": ["channels", "total"],
+                "properties": {
+                    "channels": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Channel"
+                        }
+                    },
+                    "total": {
+                        "description": "How many channels match, before `limit`.",
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "ServerCheck": {
+                "description": "A check of `pingpong doctor`.",
+                "type": "object",
+                "required": ["name", "status"],
+                "properties": {
+                    "name": {
+                        "description": "`database`, `migrations`, `secretKey` or `redis`. More can come.",
+                        "type": "string"
+                    },
+                    "status": {
+                        "description": "`skipped`: not configured, such as Redis on one server.",
+                        "type": "string",
+                        "enum": ["ok", "failed", "skipped"]
+                    },
+                    "detail": {
+                        "type": "string"
+                    }
+                }
+            },
+            "ServerStatus": {
+                "description": "The state of the server that answers, for its operators.",
+                "type": "object",
+                "required": [
+                    "version",
+                    "startedAt",
+                    "healthy",
+                    "checks",
+                    "projects",
+                    "connections",
+                    "channels"
+                ],
+                "properties": {
+                    "version": {
+                        "description": "The server's version.",
+                        "type": "string"
+                    },
+                    "startedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "healthy": {
+                        "description": "Whether every check passes.",
+                        "type": "boolean"
+                    },
+                    "checks": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ServerCheck"
+                        }
+                    },
+                    "projects": {
+                        "description": "Projects in the database.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "connections": {
+                        "description": "Sockets connected right now, every project.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "channels": {
+                        "description": "Channels with at least one subscriber right now, every project.",
                         "type": "integer",
                         "minimum": 0
                     }
