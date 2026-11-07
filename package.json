@@ -13,6 +13,7 @@
     },
     "workspaces": [
         "packages/protocol",
+        "packages/dashboard",
         "packages/server",
         "packages/client",
         "spikes/socket-io"

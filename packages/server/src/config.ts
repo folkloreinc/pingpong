@@ -23,6 +23,8 @@ export interface Config {
     defaultLimits: Limits;
     /** `PINGPONG_ADMIN_TOKEN`: the admin API (and the dashboard) exist only with it (decision 0009). */
     adminToken: string | undefined;
+    /** Serves the dashboard at `/dashboard/` with the admin API: `PINGPONG_DASHBOARD=false` turns it off. */
+    dashboard: boolean;
     /** Whether to trust `X-Forwarded-*` headers from a reverse proxy. */
     trustProxy: boolean;
     logLevel: string;
@@ -119,6 +121,8 @@ export function loadConfig(env: Env): Config {
             maxChannelsPerSocket: integer(env, 'PINGPONG_MAX_CHANNELS_PER_SOCKET', 100, 1),
         },
         adminToken: parseAdminToken(env['PINGPONG_ADMIN_TOKEN']),
+        dashboard:
+            env['PINGPONG_DASHBOARD'] === undefined ? true : boolean(env, 'PINGPONG_DASHBOARD'),
         trustProxy: boolean(env, 'PINGPONG_TRUST_PROXY'),
         logLevel: env['PINGPONG_LOG_LEVEL'] || 'info',
     };
