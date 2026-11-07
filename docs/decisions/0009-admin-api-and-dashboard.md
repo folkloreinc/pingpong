@@ -1,6 +1,6 @@
 # 0009: An admin API, and a dashboard served by Pingpong
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-06
 - Supersedes: the last point of [0007](0007-signed-api-requests.md) (the admin side goes through the CLI only)
 
