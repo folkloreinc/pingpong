@@ -47,24 +47,34 @@ describe('OpenAPI document', () => {
         expect(missing).toEqual([]);
     });
 
-    it('describes the v1 API', () => {
+    it('describes the v1 API and the admin API', () => {
         expect(Object.keys(openapi.paths)).toEqual([
             '/v1/messages',
             '/v1/messages/batch',
             '/v1/channels/{channel}',
             '/v1/origins',
             '/health',
+            '/admin/v1/status',
+            '/admin/v1/projects',
+            '/admin/v1/projects/{project}',
+            '/admin/v1/projects/{project}/rotate-secret',
+            '/admin/v1/projects/{project}/channels',
+            '/admin/v1/projects/{project}/channels/{channel}',
         ]);
     });
 
-    it('signs every v1 request', () => {
+    it('signs every v1 request, and needs the admin token for the admin API', () => {
         for (const [path, item] of Object.entries(openapi.paths)) {
             for (const [method, operation] of Object.entries(item)) {
                 if (method === 'parameters') {
                     continue;
                 }
                 expect((operation as { security?: unknown }).security, `${method} ${path}`).toEqual(
-                    path.startsWith('/v1/') ? [{ projectKey: [], requestSignature: [] }] : [],
+                    path.startsWith('/v1/')
+                        ? [{ projectKey: [], requestSignature: [] }]
+                        : path.startsWith('/admin/v1/')
+                          ? [{ adminToken: [] }]
+                          : [],
                 );
             }
         }

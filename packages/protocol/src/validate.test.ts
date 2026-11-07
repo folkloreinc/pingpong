@@ -20,8 +20,19 @@ function pointers(name: SchemaName, value: unknown): string[] {
 
 describe('the examples of docs/protocol.md', () => {
     it('validate', () => {
-        const [publish, channel, origins, connected, subscribe, message, count, ...others] =
-            readJsonExamples('docs/protocol.md');
+        const [
+            publish,
+            channel,
+            origins,
+            connected,
+            subscribe,
+            message,
+            count,
+            create,
+            patch,
+            stats,
+            ...others
+        ] = readJsonExamples('docs/protocol.md');
         expect(others).toEqual([]);
         expect(validate('PublishRequest', publish)).toMatchObject({ valid: true });
         expect(validate('Channel', channel)).toMatchObject({ valid: true });
@@ -30,6 +41,9 @@ describe('the examples of docs/protocol.md', () => {
         expect(validate('SocketSubscribeRequest', subscribe)).toMatchObject({ valid: true });
         expect(validate('SocketMessage', message)).toMatchObject({ valid: true });
         expect(validate('SocketSubscriptionCount', count)).toMatchObject({ valid: true });
+        expect(validate('AdminProjectCreate', create)).toMatchObject({ valid: true });
+        expect(validate('AdminProjectPatch', patch)).toMatchObject({ valid: true });
+        expect(validate('ProjectStats', stats)).toMatchObject({ valid: true });
     });
 });
 
@@ -126,6 +140,59 @@ describe('SocketSubscribeResult', () => {
             pointers('SocketSubscribeResult', { ok: false, error: 'invalid_signature' }),
         ).toEqual([]);
         expect(validate('SocketSubscribeResult', { ok: false, error: 'nope' }).valid).toBe(false);
+    });
+});
+
+describe('AdminProjectCreate', () => {
+    it('needs an id, and takes a name, origins, limits and a status', () => {
+        expect(pointers('AdminProjectCreate', { id: 'my-app' })).toEqual([]);
+        expect(
+            pointers('AdminProjectCreate', {
+                id: 'my-app',
+                name: 'My app',
+                origins: ['https://example.com', 'https://*.example.com'],
+                limits: { maxConnections: 500, maxMessageSize: null },
+                disabled: true,
+            }),
+        ).toEqual([]);
+        expect(pointers('AdminProjectCreate', {})).toEqual(['/id']);
+    });
+
+    it('refuses bad ids, origins and limits, and unknown fields', () => {
+        expect(
+            pointers('AdminProjectCreate', {
+                id: 'My App',
+                origins: ['https://example.com/path'],
+                limits: { maxConnections: 0, maxSockets: 1 },
+                key: 'pk_mine',
+            }).sort(),
+        ).toEqual(['/id', '/key', '/limits/maxConnections', '/limits/maxSockets', '/origins/0']);
+    });
+});
+
+describe('AdminProjectPatch', () => {
+    it('changes at least one thing', () => {
+        expect(pointers('AdminProjectPatch', { disabled: false })).toEqual([]);
+        expect(pointers('AdminProjectPatch', { origins: [] })).toEqual([]);
+        expect(validate('AdminProjectPatch', {}).valid).toBe(false);
+    });
+
+    it("doesn't change the id or the key", () => {
+        expect(pointers('AdminProjectPatch', { id: 'other', key: 'pk_x' })).toEqual([
+            '/id',
+            '/key',
+        ]);
+    });
+});
+
+describe('AdminSecretRotation', () => {
+    it('takes a grace period in seconds, up to 30 days', () => {
+        expect(pointers('AdminSecretRotation', {})).toEqual([]);
+        expect(pointers('AdminSecretRotation', { gracePeriod: 0 })).toEqual([]);
+        expect(pointers('AdminSecretRotation', { gracePeriod: -1 })).toEqual(['/gracePeriod']);
+        expect(pointers('AdminSecretRotation', { gracePeriod: 2_592_001 })).toEqual([
+            '/gracePeriod',
+        ]);
     });
 });
 

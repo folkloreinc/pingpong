@@ -2,7 +2,7 @@
 
 The protocol between [Pingpong](https://github.com/folkloreinc/pingpong), the applications that publish and the clients that subscribe. [`docs/protocol.md`](https://github.com/folkloreinc/pingpong/blob/main/docs/protocol.md) explains it.
 
-- [`schema/openapi.json`](schema/openapi.json): the OpenAPI 3.1 document, written by hand. It is the reference for the HTTP API, and its `Socket*` schemas are the payloads of the Socket.IO events.
+- [`schema/openapi.json`](schema/openapi.json): the OpenAPI 3.1 document, written by hand. It is the reference for the HTTP API (`/v1` for applications, `/admin/v1` for operators), and its `Socket*` schemas are the payloads of the Socket.IO events.
 - [`schema/pingpong.schema.json`](schema/pingpong.schema.json): the same schemas as one JSON Schema (2020-12). Reference a definition with `urn:pingpong:protocol:v1#/$defs/PublishRequest`.
 - TypeScript types and a validator, generated from the OpenAPI document.
 - `@pingpong-io/protocol/events`: the Socket.IO event names, without Node dependencies.
