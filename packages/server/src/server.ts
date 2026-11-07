@@ -9,6 +9,8 @@ import { createDatabase } from './database/connection.ts';
 import type { Database } from './database/connection.ts';
 import { pendingMigrations } from './database/migrate.ts';
 import { adminRoutes } from './http/admin.ts';
+import { dashboardRoutes, findDashboard } from './http/dashboard.ts';
+import type { StaticFile } from './http/dashboard.ts';
 import { registerRoutes } from './http/routes.ts';
 import { ProjectCache } from './projects/cache.ts';
 import { Projects } from './projects/projects.ts';
@@ -31,6 +33,11 @@ export interface ServerOptions {
     database?: Database;
     /** Fastify's logger: false to disable it. */
     logger?: boolean;
+    /**
+     * The built dashboard to serve at `/dashboard/`, instead of the files of the installed
+     * `@pingpong-io/dashboard`. Only with an admin token and `PINGPONG_DASHBOARD` (decision 0009).
+     */
+    dashboard?: Map<string, StaticFile>;
 }
 
 /**
@@ -97,6 +104,18 @@ export async function createPingpongServer(
             },
             secretGracePeriod: config.secretGracePeriod,
         });
+        // The dashboard is useless without the admin API, and the admin token is its sign-in.
+        if (config.dashboard) {
+            const found =
+                options.dashboard === undefined
+                    ? await findDashboard()
+                    : { files: options.dashboard };
+            if (found.files !== undefined) {
+                void app.register(dashboardRoutes, { files: found.files });
+            } else {
+                app.log.warn({ err: found.error }, "The dashboard can't be served");
+            }
+        }
     }
 
     return {

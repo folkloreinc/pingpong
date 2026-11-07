@@ -1,0 +1,69 @@
+.secret {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--panneau-space-2);
+}
+
+.secretValue {
+    flex: 1 1 16rem;
+    min-width: 0;
+    padding: var(--panneau-space-2) var(--panneau-space-3);
+    border: var(--panneau-border-width) solid var(--panneau-color-border);
+    border-radius: var(--panneau-radius-md);
+    background: var(--panneau-color-surface-sunken);
+    font-size: var(--panneau-font-size-sm);
+    overflow-wrap: anywhere;
+}
+
+.block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--panneau-space-3);
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--panneau-space-3);
+}
+
+/* A table that scrolls in its box on narrow screens. */
+.tableBox {
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--panneau-font-size-sm);
+    font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+    padding: var(--panneau-space-2) var(--panneau-space-3);
+    border-top: var(--panneau-border-width) solid var(--panneau-color-border);
+    text-align: start;
+    white-space: nowrap;
+}
+
+.table thead th {
+    border-top: 0;
+    color: var(--panneau-color-text-muted);
+    font-weight: var(--panneau-font-weight-medium);
+}
+
+.end {
+    text-align: end !important;
+}
+
+.link {
+    color: var(--panneau-color-link);
+    text-decoration: none;
+}
+
+.link:hover {
+    text-decoration: underline;
+}

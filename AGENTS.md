@@ -32,6 +32,8 @@ packages/
   server/     @pingpong-io/server: projects, Socket.IO, HTTP API, `pingpong` CLI
               (`@pingpong-io/server/testing` starts a server for tests)
   client/     @pingpong-io/client: JavaScript client, for browsers and Node
+  dashboard/  @pingpong-io/dashboard: the operations dashboard, a Panneau 5 app on the admin API,
+              served by the server at /dashboard/ (decision 0009)
 spikes/
   socket-io/  Phase 0 spike, private, not published
 docker/       Dockerfile, entry point and smoke test

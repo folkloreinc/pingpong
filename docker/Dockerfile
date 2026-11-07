@@ -8,13 +8,15 @@
 
 FROM node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 AS node
 
-# The Pingpong packages, as they are published to npm, with their production dependencies.
+# The Pingpong packages, as they are published to npm, with their production dependencies. The
+# dashboard ships its built app only (decision 0009): it brings no runtime dependency.
 FROM node AS app
 
 WORKDIR /src
 
 COPY package.json package-lock.json tsconfig.base.json tsconfig.json ./
 COPY packages/protocol/package.json packages/protocol/
+COPY packages/dashboard/package.json packages/dashboard/
 COPY packages/server/package.json packages/server/
 COPY packages/client/package.json packages/client/
 COPY spikes/socket-io/package.json spikes/socket-io/
@@ -22,15 +24,16 @@ RUN npm ci --ignore-scripts
 
 COPY config config
 COPY packages packages
-RUN npm run build -w @pingpong-io/protocol -w @pingpong-io/server \
+RUN npm run build -w @pingpong-io/protocol -w @pingpong-io/dashboard -w @pingpong-io/server \
     && mkdir /tmp/packs \
-    && npm pack -w @pingpong-io/protocol -w @pingpong-io/server --pack-destination /tmp/packs
+    && npm pack -w @pingpong-io/protocol -w @pingpong-io/dashboard -w @pingpong-io/server \
+        --pack-destination /tmp/packs
 
 # Unpack each package where npm expects its workspace, then install the server's production
 # dependencies from the lockfile. The other workspaces only need their package.json for it.
 WORKDIR /app
 RUN cp /src/package.json /src/package-lock.json . \
-    && for workspace in protocol server; do \
+    && for workspace in protocol dashboard server; do \
         mkdir -p "packages/${workspace}"; \
         tar -xzf /tmp/packs/pingpong-io-${workspace}-*.tgz -C "packages/${workspace}" --strip-components=1; \
     done \

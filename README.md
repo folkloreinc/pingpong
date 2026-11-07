@@ -29,12 +29,13 @@ Realtime updates (new comments, notifications, live scores, votes, progress bars
 
 ## Packages
 
-| Package                     | Contents                                                     |
-| --------------------------- | ------------------------------------------------------------ |
-| `@pingpong-io/protocol`     | Messages, HTTP API and their schemas                         |
-| `@pingpong-io/server`       | Socket.IO, the HTTP API and the `pingpong` CLI, Docker image |
-| `@pingpong-io/client`       | JavaScript client                                            |
-| `folklore/laravel-pingpong` | Laravel broadcaster, in its own repository                   |
+| Package                     | Contents                                                           |
+| --------------------------- | ------------------------------------------------------------------ |
+| `@pingpong-io/protocol`     | Messages, HTTP API and their schemas                               |
+| `@pingpong-io/server`       | Socket.IO, the HTTP API and the `pingpong` CLI, Docker image       |
+| `@pingpong-io/client`       | JavaScript client                                                  |
+| `@pingpong-io/dashboard`    | The operations dashboard, which the server serves at `/dashboard/` |
+| `folklore/laravel-pingpong` | Laravel broadcaster, in its own repository                         |
 
 ## Releases
 

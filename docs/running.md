@@ -19,6 +19,7 @@ Then the same with `serve` (the default command), with `-p 3000:3000`. `projects
 | ------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
 | `PINGPONG_DATABASE_URL`                           | required          | `postgres://user:password@host:5432/pingpong`, or `sqlite:///var/lib/pingpong/pingpong.db`        |
 | `PINGPONG_SECRET_KEY`                             | required          | 32 bytes, as 64 hex characters or base64 (`openssl rand -hex 32`). Encrypts the projects' secrets |
+| `PINGPONG_DASHBOARD`                              | `true`            | With the admin token, serves the dashboard at `/dashboard/`. `false` turns it off                 |
 | `PINGPONG_ADMIN_TOKEN`                            | none              | At least 32 characters (`openssl rand -hex 32`). Turns on the admin API, `/admin/v1`              |
 | `PINGPONG_REDIS_URL`                              | none              | With Redis, Socket.IO uses the Redis Streams adapter: several servers share messages and recovery |
 | `PINGPONG_HOST`, `PINGPONG_PORT`                  | `0.0.0.0`, `3000` |                                                                                                   |
@@ -61,10 +62,18 @@ The token can do what a shell on the server can do: keep it with the secret key,
 
 The live numbers are those of the server that answers, since it started: connections now and at their peak, connections refused by reason, messages published and their bytes, requests over the rate limit. A restart starts them again.
 
-On a server that the internet reaches, a rule of the reverse proxy can keep `/admin/` to the operators, for example by address:
+## The dashboard
+
+With the admin token, the server also serves the operations dashboard at `/dashboard/`: the server's checks and live numbers, and the projects, which it creates, changes, disables, deletes and gives a new secret, showing a secret only once. Operators sign in by pasting the admin token, which stays in the browser tab's `sessionStorage` until they close it or log out, and is sent as a bearer token, never as a cookie. It speaks English and French, after the browser's language. `PINGPONG_DASHBOARD=false` turns it off.
+
+The dashboard is served from the same origin as the admin API, with a strict Content Security Policy: its own scripts, styles and images only, and requests to its own origin.
+
+## Keeping the admin API to the operators
+
+On a server that the internet reaches, a rule of the reverse proxy can keep `/admin/` and `/dashboard/` to the operators, for example by address:
 
 ```nginx
-location /admin/ {
+location ~ ^/(admin|dashboard)/ {
     allow 203.0.113.0/24;
     deny all;
     proxy_pass http://127.0.0.1:3000;
