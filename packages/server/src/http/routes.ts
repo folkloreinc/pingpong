@@ -8,6 +8,7 @@ import {
     verifyRequestSignature,
 } from '@pingpong-io/protocol/signatures';
 
+import { ConflictError, InvalidValueError, NotFoundError } from '../errors.ts';
 import type { ProjectCache } from '../projects/cache.ts';
 import type { Project, Projects } from '../projects/projects.ts';
 import type { Realtime } from '../realtime/realtime.ts';
@@ -139,6 +140,7 @@ export function registerRoutes(app: FastifyInstance, dependencies: RouteDependen
             const count = messages.reduce((total, message) => total + message.channels.length, 0);
             const wait = limiter.take(project.id, count, project.limits.maxMessagesPerSecond);
             if (wait > 0) {
+                realtime.stats.rateLimited(project.id);
                 throw new HttpProblem(
                     429,
                     'Too Many Requests',
@@ -213,13 +215,19 @@ export function registerRoutes(app: FastifyInstance, dependencies: RouteDependen
         const problem =
             error instanceof HttpProblem
                 ? error
-                : error.code === 'FST_ERR_CTP_BODY_TOO_LARGE'
-                  ? new HttpProblem(413, 'Content Too Large', 'The body is too large.')
-                  : error.code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE'
-                    ? new HttpProblem(415, 'Unsupported Media Type', 'Send application/json.')
-                    : typeof error.statusCode === 'number' && error.statusCode < 500
-                      ? new HttpProblem(error.statusCode, error.message)
-                      : null;
+                : error instanceof NotFoundError
+                  ? new HttpProblem(404, 'Not Found', error.message)
+                  : error instanceof ConflictError
+                    ? new HttpProblem(409, 'Conflict', error.message)
+                    : error instanceof InvalidValueError
+                      ? new HttpProblem(422, 'Unprocessable Content', error.message)
+                      : error.code === 'FST_ERR_CTP_BODY_TOO_LARGE'
+                        ? new HttpProblem(413, 'Content Too Large', 'The body is too large.')
+                        : error.code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE'
+                          ? new HttpProblem(415, 'Unsupported Media Type', 'Send application/json.')
+                          : typeof error.statusCode === 'number' && error.statusCode < 500
+                            ? new HttpProblem(error.statusCode, error.message)
+                            : null;
         if (problem === null) {
             request.log.error(error);
             return reply

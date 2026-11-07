@@ -19,6 +19,7 @@ Then the same with `serve` (the default command), with `-p 3000:3000`. `projects
 | ------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
 | `PINGPONG_DATABASE_URL`                           | required          | `postgres://user:password@host:5432/pingpong`, or `sqlite:///var/lib/pingpong/pingpong.db`        |
 | `PINGPONG_SECRET_KEY`                             | required          | 32 bytes, as 64 hex characters or base64 (`openssl rand -hex 32`). Encrypts the projects' secrets |
+| `PINGPONG_ADMIN_TOKEN`                            | none              | At least 32 characters (`openssl rand -hex 32`). Turns on the admin API, `/admin/v1`              |
 | `PINGPONG_REDIS_URL`                              | none              | With Redis, Socket.IO uses the Redis Streams adapter: several servers share messages and recovery |
 | `PINGPONG_HOST`, `PINGPONG_PORT`                  | `0.0.0.0`, `3000` |                                                                                                   |
 | `PINGPONG_PING_INTERVAL`, `PINGPONG_PING_TIMEOUT` | `10000`, `5000`   | Milliseconds. Shorter than Socket.IO's defaults, so drops are noticed sooner (decision 0006)      |
@@ -44,7 +45,32 @@ pingpong projects rotate-secret my-app
 pingpong projects delete my-app --yes
 ```
 
-`create` and `rotate-secret` show the secret once: put it in the application's environment. After a rotation, the previous secret works for the grace period, so the application can deploy the new one without downtime. A limit set to `default` goes back to the server's default. A project without origins accepts any client that has its key; private channels still need a signature.
+The [admin API](#the-admin-api) does the same over HTTP. `create` and `rotate-secret` show the secret once: put it in the application's environment. After a rotation, the previous secret works for the grace period, so the application can deploy the new one without downtime. A limit set to `default` goes back to the server's default. A project without origins accepts any client that has its key; private channels still need a signature.
+
+## The admin API
+
+With `PINGPONG_ADMIN_TOKEN`, the server answers the admin API at `/admin/v1` (decision 0009): what the `pingpong projects` commands do, the checks of `pingpong doctor`, and what the server sees live, such as its connections and the channels of each project. Requests send the token as a bearer token. [`docs/protocol.md`](protocol.md#the-admin-api) lists its routes, and the OpenAPI document describes them.
+
+```bash
+curl -H "Authorization: Bearer $PINGPONG_ADMIN_TOKEN" https://pingpong.example.com/admin/v1/status
+curl -H "Authorization: Bearer $PINGPONG_ADMIN_TOKEN" -H "Content-Type: application/json" \
+    -d '{"id": "my-app", "origins": ["https://example.com"]}' https://pingpong.example.com/admin/v1/projects
+```
+
+The token can do what a shell on the server can do: keep it with the secret key, and send it only over HTTPS. Changing it means restarting the server. Disabling or deleting a project through the admin API disconnects its sockets right away; through the CLI, which runs in its own process, connected sockets stay until they reconnect.
+
+The live numbers are those of the server that answers, since it started: connections now and at their peak, connections refused by reason, messages published and their bytes, requests over the rate limit. A restart starts them again.
+
+On a server that the internet reaches, a rule of the reverse proxy can keep `/admin/` to the operators, for example by address:
+
+```nginx
+location /admin/ {
+    allow 203.0.113.0/24;
+    deny all;
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header Host $host;
+}
+```
 
 ## Behind a reverse proxy
 
@@ -69,4 +95,4 @@ With `PINGPONG_REDIS_URL`, every server shares messages and recovered sessions t
 
 ## Checks
 
-`pingpong doctor` checks the database, the migrations, that the secret key decrypts every project's secret, and Redis. `GET /health` answers 200 while the database and Redis answer, for load balancers.
+`pingpong doctor` checks the database, the migrations, that the secret key decrypts every project's secret, and Redis. `GET /admin/v1/status` gives the same checks. `GET /health` answers 200 while the database and Redis answer, for load balancers.

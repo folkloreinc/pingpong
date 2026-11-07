@@ -51,3 +51,21 @@ describe('the secret key', () => {
         expect(() => requireSecretKey(loadConfig(base))).toThrow(/openssl rand -hex 32/);
     });
 });
+
+describe('the admin token', () => {
+    it('is optional: without it, there is no admin API', () => {
+        expect(loadConfig(base).adminToken).toBeUndefined();
+        expect(loadConfig({ ...base, PINGPONG_ADMIN_TOKEN: '' }).adminToken).toBeUndefined();
+    });
+
+    it('has at least 32 characters and no spaces', () => {
+        const token = 'f'.repeat(64);
+        expect(loadConfig({ ...base, PINGPONG_ADMIN_TOKEN: token }).adminToken).toBe(token);
+        expect(() => loadConfig({ ...base, PINGPONG_ADMIN_TOKEN: 'f'.repeat(31) })).toThrow(
+            /at least 32 characters/,
+        );
+        expect(() =>
+            loadConfig({ ...base, PINGPONG_ADMIN_TOKEN: `${'f'.repeat(32)} ${'f'.repeat(32)}` }),
+        ).toThrow(ConfigError);
+    });
+});

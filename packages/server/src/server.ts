@@ -8,6 +8,7 @@ import type { Config } from './config.ts';
 import { createDatabase } from './database/connection.ts';
 import type { Database } from './database/connection.ts';
 import { pendingMigrations } from './database/migrate.ts';
+import { adminRoutes } from './http/admin.ts';
 import { registerRoutes } from './http/routes.ts';
 import { ProjectCache } from './projects/cache.ts';
 import { Projects } from './projects/projects.ts';
@@ -81,6 +82,22 @@ export async function createPingpongServer(
             await redis?.ping();
         },
     });
+    if (config.adminToken !== undefined) {
+        void app.register(adminRoutes, {
+            prefix: '/admin/v1',
+            adminToken: config.adminToken,
+            projects,
+            cache,
+            realtime,
+            database,
+            checks: {
+                database,
+                secretKey,
+                pingRedis: redis === undefined ? undefined : () => redis.ping(),
+            },
+            secretGracePeriod: config.secretGracePeriod,
+        });
+    }
 
     return {
         app,

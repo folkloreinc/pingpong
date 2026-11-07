@@ -22,7 +22,9 @@ import { verifyChannelSignature } from '@pingpong-io/protocol/signatures';
 import { safeEqual } from '../crypto.ts';
 import { isOriginAllowed } from '../origins.ts';
 import type { ProjectCache } from '../projects/cache.ts';
+import type { Project } from '../projects/projects.ts';
 import { SubscriptionCounts } from './counts.ts';
+import { ProjectStats } from './stats.ts';
 
 const PROJECT_NAMESPACE = /^\/projects\/[a-z0-9][a-z0-9-]{0,62}$/;
 
@@ -53,6 +55,8 @@ function projectIdOf(namespace: Namespace): string {
  */
 export class Realtime {
     readonly io: Server;
+    /** What this server counted per project since it started (decision 0009). */
+    readonly stats = new ProjectStats();
     readonly #projects: ProjectCache;
     readonly #counts: SubscriptionCounts;
 
@@ -92,30 +96,42 @@ export class Realtime {
     }
 
     async #authorize(socket: Socket): Promise<void> {
-        const project = await this.#projects.find(projectIdOf(socket.nsp));
+        const projectId = projectIdOf(socket.nsp);
+        const project = await this.#projects.find(projectId);
         if (project === undefined) {
+            // Not counted: any id can be tried, and only projects have counters.
             throw refuse('unknown_project');
         }
+        const reason = this.#refusal(socket, project);
+        if (reason !== undefined) {
+            this.stats.refused(projectId, reason);
+            throw refuse(reason);
+        }
+    }
+
+    #refusal(socket: Socket, project: Project): SocketConnectError | undefined {
         if (project.disabled) {
-            throw refuse('project_disabled');
+            return 'project_disabled';
         }
         const auth: unknown = socket.handshake.auth;
         const key = typeof auth === 'object' && auth !== null && 'key' in auth ? auth.key : null;
         if (typeof key !== 'string' || !safeEqual(key, project.key)) {
-            throw refuse('invalid_key');
+            return 'invalid_key';
         }
         const origin = socket.handshake.headers.origin;
         if (origin !== undefined && !isOriginAllowed(project.origins, origin)) {
-            throw refuse('origin_not_allowed');
+            return 'origin_not_allowed';
         }
         if (socket.nsp.sockets.size >= project.limits.maxConnections) {
-            throw refuse('too_many_connections');
+            return 'too_many_connections';
         }
+        return undefined;
     }
 
     #onConnection(socket: Socket): void {
         // The first packet, broadcast to the socket's own room, gives the client an offset:
         // without one, it couldn't be recovered (decision 0006).
+        this.stats.connected(projectIdOf(socket.nsp), socket.nsp.sockets.size);
         const connected: SocketConnected = { socketId: socket.id, recovered: socket.recovered };
         socket.nsp.to(socket.id).emit(SOCKET_EVENTS.connected, connected);
 
@@ -185,6 +201,15 @@ export class Realtime {
     /** Sends a message to the subscribers of its channels, once per channel. */
     publish(projectId: string, message: PublishRequest): void {
         const namespace = this.#namespace(projectId);
+        // The payload's size without its channel: channel names need no escaping in JSON.
+        const size = Buffer.byteLength(
+            JSON.stringify({ channel: '', event: message.event, data: message.data }),
+        );
+        this.stats.published(
+            projectId,
+            message.channels.length,
+            message.channels.reduce((total, channel) => total + size + channel.length, 0),
+        );
         for (const channel of message.channels) {
             const payload: SocketMessage = {
                 channel,
@@ -201,7 +226,55 @@ export class Realtime {
 
     /** The number of sockets subscribed to a channel of a project, on this server. */
     subscriptionCount(projectId: string, channel: string): number {
-        return SubscriptionCounts.count(this.#namespace(projectId), channel);
+        // A project this server hasn't seen has no subscriber here: no namespace is opened for it.
+        const namespace = this.#openNamespace(projectId);
+        return namespace === undefined ? 0 : SubscriptionCounts.count(namespace, channel);
+    }
+
+    /**
+     * A project's namespace, if this server opened it: a client tried to connect, or a message was
+     * published. Unlike `#namespace()`, it doesn't open one.
+     */
+    #openNamespace(projectId: string): Namespace | undefined {
+        return this.io._nsps.get(projectNamespace(projectId));
+    }
+
+    /** The sockets connected to a project on this server. */
+    connections(projectId: string): number {
+        return this.#openNamespace(projectId)?.sockets.size ?? 0;
+    }
+
+    /** The channels of a project that sockets of this server are subscribed to, and how many. */
+    channels(projectId: string): { channel: string; subscriptionCount: number }[] {
+        const namespace = this.#openNamespace(projectId);
+        if (namespace === undefined) {
+            return [];
+        }
+        const { rooms, sids } = namespace.adapter;
+        // Every socket is in a room named after its id: it isn't a channel.
+        return [...rooms]
+            .filter(([room, sockets]) => !sids.has(room) && sockets.size > 0)
+            .map(([channel, sockets]) => ({ channel, subscriptionCount: sockets.size }));
+    }
+
+    /** The projects whose namespace this server opened, by id. */
+    projectIds(): string[] {
+        return [...this.io._nsps.values()]
+            .filter((namespace) => PROJECT_NAMESPACE.test(namespace.name))
+            .map(projectIdOf);
+    }
+
+    /**
+     * Disconnects every socket of a project, on every server (through the adapter), after it was
+     * disabled or deleted. Its clients don't reconnect by themselves: the server closed them.
+     */
+    disconnectProject(projectId: string): void {
+        this.#namespace(projectId).disconnectSockets();
+    }
+
+    /** Forgets a deleted project's counters. */
+    forgetProject(projectId: string): void {
+        this.stats.forget(projectId);
     }
 
     /** Sends the subscription counts that changed now, instead of at the next interval. */
