@@ -1,5 +1,12 @@
 # @pingpong-io/client
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [aebba1e]
+  - @pingpong-io/protocol@0.3.0
+
 ## 0.2.1
 
 ### Patch Changes
