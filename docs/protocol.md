@@ -138,17 +138,18 @@ When it says `"recovered": false`, the socket is new: the client subscribes to i
 
 `/admin/v1` is for the server's operators and its dashboard ([0009](decisions/0009-admin-api-and-dashboard.md)), not for applications. It exists only when the server has an admin token (`PINGPONG_ADMIN_TOKEN`), which requests send as a bearer token: `Authorization: Bearer <token>`. It does what the `pingpong projects` CLI does, and shows the server's live state.
 
-| Request                                               | What it does                                                                 |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `GET /admin/v1/status`                                | The server's version, the checks of `pingpong doctor`, connections, channels |
-| `GET /admin/v1/projects`                              | The projects                                                                 |
-| `POST /admin/v1/projects`                             | Create a project. The response has its secret, this once                     |
-| `GET /admin/v1/projects/{project}`                    | A project, without its secret                                                |
-| `PATCH /admin/v1/projects/{project}`                  | Change its name, origins, limits, or disable it                              |
-| `DELETE /admin/v1/projects/{project}`                 | Delete it                                                                    |
-| `POST /admin/v1/projects/{project}/rotate-secret`     | A new secret, this once. The previous one works for the grace period         |
-| `GET /admin/v1/projects/{project}/channels`           | Its channels and their subscribers, most subscribed first                    |
-| `GET /admin/v1/projects/{project}/channels/{channel}` | One channel                                                                  |
+| Request                                               | What it does                                                                                      |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `GET /admin/v1/status`                                | The server's version, the checks of `pingpong doctor`, connections, channels                      |
+| `GET /admin/v1/projects`                              | The projects                                                                                      |
+| `POST /admin/v1/projects`                             | Create a project. The response has its secret, this once                                          |
+| `GET /admin/v1/projects/{project}`                    | A project, without its secret                                                                     |
+| `PATCH /admin/v1/projects/{project}`                  | Change its name, origins, limits, or disable it                                                   |
+| `DELETE /admin/v1/projects/{project}`                 | Delete it                                                                                         |
+| `POST /admin/v1/projects/{project}/rotate-secret`     | A new secret, this once. The previous one works for the grace period                              |
+| `GET /admin/v1/projects/{project}/channels`           | Its channels and their subscribers, most subscribed first                                         |
+| `GET /admin/v1/projects/{project}/channels/{channel}` | One channel                                                                                       |
+| `GET /admin/v1/usage?days=30&project=my-app`          | Usage per project and UTC day, kept in the database ([0010](decisions/0010-usage-and-metrics.md)) |
 
 Creating a project:
 
@@ -178,6 +179,21 @@ A project comes with `stats`: what the server that answers counted since it star
     "channels": 87,
     "messages": 15230,
     "bytes": 2048311,
+    "rateLimited": 0
+}
+```
+
+Usage is kept per project and UTC day ([0010](decisions/0010-usage-and-metrics.md)): every server adds its counts to the day's row every minute, so today is up to a minute behind. A line of `GET /admin/v1/usage`:
+
+```json
+{
+    "project": "my-app",
+    "day": "2026-11-06",
+    "messages": 15230,
+    "bytes": 2048311,
+    "connectionMinutes": 381220,
+    "peakConnections": 530,
+    "connectionsRefused": 3,
     "rateLimited": 0
 }
 ```

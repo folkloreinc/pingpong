@@ -245,6 +245,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the usage of the projects
+         * @description What each project used, per UTC day, over the last `days` days, today included. Every server adds its counts to the day's row every minute, so today is up to a minute behind. The usage of a deleted project is kept, under its id (decision 0010).
+         */
+        get: operations["adminGetUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -497,6 +517,41 @@ export interface components {
             connections: number;
             /** @description Channels with at least one subscriber right now, every project. */
             channels: number;
+        };
+        /** @description What a project used on a UTC day, on every server. */
+        UsageLine: {
+            project: components["schemas"]["ProjectId"];
+            /**
+             * Format: date
+             * @description The UTC day.
+             */
+            day: string;
+            /** @description Messages published: one per channel of each publish request. */
+            messages: number;
+            /** @description Bytes of the messages published, serialized. */
+            bytes: number;
+            /** @description The project's connected sockets, added up minute by minute: what it costs to keep them open. */
+            connectionMinutes: number;
+            /** @description The most sockets connected at once on one server. With several servers, not the peak of their sum. */
+            peakConnections: number;
+            /** @description Connections refused, for any reason. */
+            connectionsRefused: number;
+            /** @description Publish requests refused because the project reached its limit of messages per second. */
+            rateLimited: number;
+        };
+        UsageReport: {
+            /**
+             * Format: date
+             * @description The first UTC day of the period.
+             */
+            since: string;
+            /**
+             * Format: date
+             * @description The last UTC day of the period: today.
+             */
+            until: string;
+            /** @description One line per project and day with usage, by day then project. A day without usage has no line. */
+            lines: components["schemas"]["UsageLine"][];
         };
         /** @description Problem details (RFC 9457). */
         Problem: {
@@ -980,6 +1035,33 @@ export interface operations {
             };
             401: components["responses"]["AdminUnauthorized"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    adminGetUsage: {
+        parameters: {
+            query?: {
+                /** @description How many UTC days, today included. */
+                days?: number;
+                /** @description Only this project's usage. */
+                project?: components["schemas"]["ProjectId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The usage, per project and day. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageReport"];
+                };
+            };
+            401: components["responses"]["AdminUnauthorized"];
             422: components["responses"]["Invalid"];
         };
     };

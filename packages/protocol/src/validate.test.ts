@@ -31,6 +31,7 @@ describe('the examples of docs/protocol.md', () => {
             create,
             patch,
             stats,
+            usage,
             ...others
         ] = readJsonExamples('docs/protocol.md');
         expect(others).toEqual([]);
@@ -44,6 +45,7 @@ describe('the examples of docs/protocol.md', () => {
         expect(validate('AdminProjectCreate', create)).toMatchObject({ valid: true });
         expect(validate('AdminProjectPatch', patch)).toMatchObject({ valid: true });
         expect(validate('ProjectStats', stats)).toMatchObject({ valid: true });
+        expect(validate('UsageLine', usage)).toMatchObject({ valid: true });
     });
 });
 
@@ -193,6 +195,32 @@ describe('AdminSecretRotation', () => {
         expect(pointers('AdminSecretRotation', { gracePeriod: 2_592_001 })).toEqual([
             '/gracePeriod',
         ]);
+    });
+});
+
+describe('UsageReport', () => {
+    it('has UTC days and counts that are never negative', () => {
+        const line = {
+            project: 'my-app',
+            day: '2026-11-06',
+            messages: 1,
+            bytes: 10,
+            connectionMinutes: 0,
+            peakConnections: 1,
+            connectionsRefused: 0,
+            rateLimited: 0,
+        };
+        expect(
+            validate('UsageReport', { since: '2026-10-08', until: '2026-11-06', lines: [line] })
+                .valid,
+        ).toBe(true);
+        expect(
+            pointers('UsageReport', {
+                since: '2026-10-08T00:00:00Z',
+                until: '2026-11-06',
+                lines: [{ ...line, messages: -1 }],
+            }).sort(),
+        ).toEqual(['/lines/0/messages', '/since']);
     });
 });
 

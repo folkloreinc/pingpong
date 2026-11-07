@@ -751,6 +751,87 @@
                 }
             }
         },
+        "UsageLine": {
+            "description": "What a project used on a UTC day, on every server.",
+            "type": "object",
+            "required": [
+                "project",
+                "day",
+                "messages",
+                "bytes",
+                "connectionMinutes",
+                "peakConnections",
+                "connectionsRefused",
+                "rateLimited"
+            ],
+            "properties": {
+                "project": {
+                    "$ref": "#/$defs/ProjectId"
+                },
+                "day": {
+                    "description": "The UTC day.",
+                    "type": "string",
+                    "format": "date"
+                },
+                "messages": {
+                    "description": "Messages published: one per channel of each publish request.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "bytes": {
+                    "description": "Bytes of the messages published, serialized.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "connectionMinutes": {
+                    "description": "The project's connected sockets, added up minute by minute: what it costs to keep them open.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "peakConnections": {
+                    "description": "The most sockets connected at once on one server. With several servers, not the peak of their sum.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "connectionsRefused": {
+                    "description": "Connections refused, for any reason.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "rateLimited": {
+                    "description": "Publish requests refused because the project reached its limit of messages per second.",
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "UsageReport": {
+            "type": "object",
+            "required": [
+                "since",
+                "until",
+                "lines"
+            ],
+            "properties": {
+                "since": {
+                    "description": "The first UTC day of the period.",
+                    "type": "string",
+                    "format": "date"
+                },
+                "until": {
+                    "description": "The last UTC day of the period: today.",
+                    "type": "string",
+                    "format": "date"
+                },
+                "lines": {
+                    "description": "One line per project and day with usage, by day then project. A day without usage has no line.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/UsageLine"
+                    }
+                }
+            }
+        },
         "Problem": {
             "description": "Problem details (RFC 9457).",
             "type": "object",

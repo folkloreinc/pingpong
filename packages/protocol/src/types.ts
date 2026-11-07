@@ -40,4 +40,6 @@ export type AdminProjectSecret = Schemas['AdminProjectSecret'];
 export type AdminChannelList = Schemas['AdminChannelList'];
 export type ServerCheck = Schemas['ServerCheck'];
 export type ServerStatus = Schemas['ServerStatus'];
+export type UsageLine = Schemas['UsageLine'];
+export type UsageReport = Schemas['UsageReport'];
 export type Problem = Schemas['Problem'];

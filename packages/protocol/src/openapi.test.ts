@@ -60,6 +60,7 @@ describe('OpenAPI document', () => {
             '/admin/v1/projects/{project}/rotate-secret',
             '/admin/v1/projects/{project}/channels',
             '/admin/v1/projects/{project}/channels/{channel}',
+            '/admin/v1/usage',
         ]);
     });
 
