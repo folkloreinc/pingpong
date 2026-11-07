@@ -13,3 +13,4 @@ Architecture decision records for Pingpong. Each record is short: context, decis
 | [0007](0007-signed-api-requests.md)                | Applications sign their API requests                     | Accepted |
 | [0008](0008-database-and-http.md)                  | PostgreSQL or SQLite through Kysely, Fastify for the API | Accepted |
 | [0009](0009-admin-api-and-dashboard.md)            | An admin API, and a dashboard served by Pingpong         | Accepted |
+| [0010](0010-usage-and-metrics.md) | Usage per project and day, and Prometheus metrics | Proposed |
