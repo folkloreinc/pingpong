@@ -1,5 +1,11 @@
 # @pingpong-io/protocol
 
+## 0.3.0
+
+### Minor Changes
+
+- aebba1e: Describe `GET /admin/v1/usage`: what each project used per UTC day, over up to 400 days (messages, bytes, connection minutes, peak connections, refused connections, rate-limited requests). New types: `UsageReport`, `UsageLine`.
+
 ## 0.2.1
 
 No changes in this release.

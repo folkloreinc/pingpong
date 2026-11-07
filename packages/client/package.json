@@ -1,6 +1,6 @@
 {
     "name": "@pingpong-io/client",
-    "version": "0.2.1",
+    "version": "0.3.0",
     "description": "JavaScript client for Pingpong, for browsers and Node",
     "type": "module",
     "license": "MIT",
@@ -32,10 +32,10 @@
         "access": "public"
     },
     "dependencies": {
-        "@pingpong-io/protocol": "^0.2.1",
+        "@pingpong-io/protocol": "^0.3.0",
         "socket.io-client": "^4.8.4"
     },
     "devDependencies": {
-        "@pingpong-io/server": "0.2.1"
+        "@pingpong-io/server": "0.3.0"
     }
 }
