@@ -3,6 +3,7 @@ import type {
     AdminProject,
     AdminProjectList,
     ServerStatus,
+    UsageReport,
 } from '@pingpong-io/protocol';
 
 import type { WidgetHandler } from './adapter/adapter.ts';
@@ -40,4 +41,21 @@ const channels: WidgetHandler = (params, { client, signal }) =>
         },
     );
 
-export const widgets: Record<string, WidgetHandler> = { overview, project, channels };
+/** What the usage page shows: the usage lines, and the names of the projects that still exist. */
+export interface UsageData {
+    report: UsageReport;
+    projects: { id: string; name: string }[];
+}
+
+const usage: WidgetHandler = async (params, { client, signal }): Promise<UsageData> => {
+    const [report, { projects }] = await Promise.all([
+        client.request<UsageReport>('/usage', {
+            query: { days: params.get('days') ?? 30, project: params.get('project') ?? undefined },
+            signal,
+        }),
+        client.request<AdminProjectList>('/projects', { signal }),
+    ]);
+    return { report, projects: projects.map(({ id, name }) => ({ id, name })) };
+};
+
+export const widgets: Record<string, WidgetHandler> = { overview, project, channels, usage };

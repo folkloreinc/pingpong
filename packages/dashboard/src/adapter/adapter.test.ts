@@ -117,7 +117,31 @@ describe('createPingpongAdapter', () => {
 
 describe('projects', () => {
     it('lists them as items, paged, sorted and filtered here', async () => {
-        const { adapter } = setup();
+        const line = (project: string, day: string, messages: number) => ({
+            project,
+            day,
+            messages,
+            bytes: 0,
+            connectionMinutes: 0,
+            peakConnections: 0,
+            connectionsRefused: 0,
+            rateLimited: 0,
+        });
+        const { adapter, requests } = setup({}, ADMIN_TOKEN, {
+            'GET /admin/v1/usage': () =>
+                json(
+                    {
+                        since: '2026-10-09',
+                        until: '2026-11-07',
+                        lines: [
+                            line('other', '2026-11-06', 7),
+                            line('other', '2026-11-07', 3),
+                            line('gone', '2026-11-07', 99),
+                        ],
+                    },
+                    { schema: 'UsageReport' },
+                ),
+        });
         const page = await adapter.list('projects', { sort: ['-name'], perPage: 1 });
         expect(page.meta).toMatchObject({ total: 2, lastPage: 2 });
         expect(page.data[0]).toMatchObject({
@@ -131,8 +155,12 @@ describe('projects', () => {
             connections: 12,
             peakConnections: 40,
             messages: 1200,
+            messages30: 10,
             abilities: { update: true, disable: true, enable: false, delete: true },
         });
+        expect(requests.find(({ url }) => url.pathname === '/admin/v1/usage')?.url.search).toBe(
+            '?days=30',
+        );
         const disabled = await adapter.list('projects', { filter: { status: 'disabled' } });
         expect(disabled.data).toEqual([]);
     });
@@ -272,5 +300,24 @@ describe('widgets', () => {
         expect(requests.at(-1)?.url.search).toBe('?prefix=comments.&limit=100');
         await adapter.getWidgetData('channels?project=my-app&prefix=');
         expect(requests.at(-1)?.url.search).toBe('');
+    });
+});
+
+describe('the usage widget', () => {
+    it('gives the report and the names of the projects', async () => {
+        const report = { since: '2026-11-01', until: '2026-11-07', lines: [] };
+        const { adapter, requests } = setup({}, ADMIN_TOKEN, {
+            'GET /admin/v1/usage': () => json(report, { schema: 'UsageReport' }),
+        });
+        await expect(adapter.getWidgetData('usage?days=7')).resolves.toEqual({
+            report,
+            projects: [
+                { id: 'my-app', name: 'My app' },
+                { id: 'other', name: 'Other' },
+            ],
+        });
+        expect(requests.find(({ url }) => url.pathname === '/admin/v1/usage')?.url.search).toBe(
+            '?days=7',
+        );
     });
 });

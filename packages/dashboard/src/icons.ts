@@ -1,11 +1,12 @@
 import type { IconComponent, NamedIconLoader } from '@panneau/ui';
-import { CircleCheck, CircleOff, Plus, RadioTower, Trash2 } from 'lucide-react';
+import { ChartLine, CircleCheck, CircleOff, Plus, RadioTower, Trash2 } from 'lucide-react';
 
 /**
  * The icons that the definition names. Panneau loads every Lucide icon by default, each in its own
  * chunk: the image would ship about 1,900 files for a few icons.
  */
 const icons: Record<string, IconComponent> = {
+    'chart-line': ChartLine,
     'circle-check': CircleCheck,
     'circle-off': CircleOff,
     plus: Plus,
