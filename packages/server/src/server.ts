@@ -12,13 +12,19 @@ import { adminRoutes } from './http/admin.ts';
 import { dashboardRoutes, findDashboard } from './http/dashboard.ts';
 import type { StaticFile } from './http/dashboard.ts';
 import { registerRoutes } from './http/routes.ts';
+import { Metrics, createMetricsServer } from './metrics.ts';
 import { ProjectCache } from './projects/cache.ts';
 import { Projects } from './projects/projects.ts';
 import { Realtime } from './realtime/realtime.ts';
+import { UsageRecorder } from './usage/usage.ts';
 
 export interface PingpongServer {
     app: FastifyInstance;
     realtime: Realtime;
+    /** Usage per project and day, flushed to the database (decision 0010). */
+    usage: UsageRecorder;
+    /** The address of `/metrics` once listening, when `PINGPONG_METRICS_PORT` is set. */
+    metricsAddress: string | undefined;
     projects: Projects;
     cache: ProjectCache;
     database: Database;
@@ -80,6 +86,15 @@ export async function createPingpongServer(
         countInterval: config.countInterval,
         ...(redis === undefined ? {} : { adapter: createAdapter(redis) }),
     });
+    const usage = new UsageRecorder(database, realtime, {
+        flushInterval: config.usageFlushInterval,
+        retentionDays: config.usageRetention,
+        onError: (error) => app.log.error({ err: error }, "Usage couldn't be written"),
+    });
+    const metricsServer =
+        config.metricsPort === undefined
+            ? undefined
+            : createMetricsServer(new Metrics(database, realtime));
     registerRoutes(app, {
         projects,
         cache,
@@ -118,16 +133,33 @@ export async function createPingpongServer(
         }
     }
 
-    return {
+    const server: PingpongServer = {
         app,
         realtime,
+        usage,
+        metricsAddress: undefined,
         projects,
         cache,
         database,
         async listen() {
-            return app.listen({ host: config.host, port: config.port });
+            const address = await app.listen({ host: config.host, port: config.port });
+            usage.start();
+            if (metricsServer !== undefined && config.metricsPort !== undefined) {
+                server.metricsAddress = await metricsServer.listen(
+                    config.metricsHost,
+                    config.metricsPort,
+                );
+            }
+            return address;
         },
         async close() {
+            await metricsServer?.close();
+            // While the sockets are still connected: their last minutes count.
+            await usage
+                .close()
+                .catch((error: unknown) =>
+                    app.log.error({ err: error }, "Usage couldn't be written"),
+                );
             // Socket.IO first: it disconnects the sockets, which would keep the HTTP server open.
             await realtime.close();
             await app.close();
@@ -137,4 +169,5 @@ export async function createPingpongServer(
             }
         },
     };
+    return server;
 }

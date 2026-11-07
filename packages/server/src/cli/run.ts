@@ -12,6 +12,7 @@ import { ConflictError, InvalidValueError, NotFoundError } from '../errors.ts';
 import { Projects } from '../projects/projects.ts';
 import type { Project, ProjectInput } from '../projects/projects.ts';
 import { createPingpongServer } from '../server.ts';
+import { MAX_USAGE_DAYS, usageReport } from '../usage/usage.ts';
 
 export interface CliIo {
     stdout: (text: string) => void;
@@ -292,6 +293,86 @@ const COMMANDS: Record<string, Command> = {
             }
             await withProjects(config, (projects) => projects.delete(id));
             io.stdout(`Deleted ${id}.\n`);
+            return EXIT.ok;
+        },
+    },
+    usage: {
+        usage: 'usage [--days <n>] [--project <id>] [--json]',
+        description: `What each project used over the last days (30 by default, up to ${MAX_USAGE_DAYS}), today included: totals per project, with their share. --json gives the lines per project and UTC day.`,
+        options: {
+            days: { type: 'string' },
+            project: { type: 'string' },
+            json: { type: 'boolean' },
+        },
+        async run({ io, config, values }) {
+            const days = typeof values['days'] === 'string' ? Number(values['days']) : 30;
+            if (!Number.isInteger(days) || days < 1 || days > MAX_USAGE_DAYS) {
+                throw new CliExit(
+                    EXIT.usage,
+                    `--days must be an integer from 1 to ${MAX_USAGE_DAYS}.`,
+                );
+            }
+            const projectId = typeof values['project'] === 'string' ? values['project'] : undefined;
+            const report = await withDatabase(config, async (database) => {
+                const pending = await pendingMigrations(database);
+                if (pending.length > 0) {
+                    throw new CliExit(
+                        EXIT.unavailable,
+                        'The database has pending migrations: run `pingpong migrate` first.',
+                    );
+                }
+                return usageReport(database, { days, projectId });
+            });
+            if (values['json'] === true) {
+                io.stdout(`${JSON.stringify(report, null, 2)}\n`);
+                return EXIT.ok;
+            }
+            const totals = new Map<
+                string,
+                {
+                    messages: number;
+                    bytes: number;
+                    minutes: number;
+                    peak: number;
+                    refused: number;
+                    rateLimited: number;
+                }
+            >();
+            for (const line of report.lines) {
+                const total = totals.get(line.project) ?? {
+                    messages: 0,
+                    bytes: 0,
+                    minutes: 0,
+                    peak: 0,
+                    refused: 0,
+                    rateLimited: 0,
+                };
+                total.messages += line.messages;
+                total.bytes += line.bytes;
+                total.minutes += line.connectionMinutes;
+                total.peak = Math.max(total.peak, line.peakConnections);
+                total.refused += line.connectionsRefused;
+                total.rateLimited += line.rateLimited;
+                totals.set(line.project, total);
+            }
+            io.stdout(`Usage from ${report.since} to ${report.until} (UTC).\n`);
+            if (totals.size === 0) {
+                io.stdout('No usage in this period.\n');
+                return EXIT.ok;
+            }
+            const all = [...totals.values()];
+            const allMessages = all.reduce((sum, total) => sum + total.messages, 0);
+            const allMinutes = all.reduce((sum, total) => sum + total.minutes, 0);
+            const share = (part: number, whole: number) =>
+                whole === 0 ? '-' : `${((part / whole) * 100).toFixed(1)}%`;
+            io.stdout(
+                'project\tmessages\tbytes\tconnection hours\tpeak\trefused\trate limited\tshare of messages\tshare of connection time\n',
+            );
+            for (const [project, total] of [...totals].sort(([a], [b]) => a.localeCompare(b))) {
+                io.stdout(
+                    `${project}\t${total.messages}\t${total.bytes}\t${(total.minutes / 60).toFixed(1)}\t${total.peak}\t${total.refused}\t${total.rateLimited}\t${share(total.messages, allMessages)}\t${share(total.minutes, allMinutes)}\n`,
+                );
+            }
             return EXIT.ok;
         },
     },

@@ -53,7 +53,7 @@ describe('the pingpong CLI', () => {
         const pending = await run('projects', 'list');
         expect(pending.code).toBe(EXIT.unavailable);
         expect(pending.stderr).toMatch(/pingpong migrate/);
-        expect((await run('migrate')).stdout).toBe('Ran 0001-projects\n');
+        expect((await run('migrate')).stdout).toBe('Ran 0001-projects\nRan 0002-usage\n');
         expect((await run('migrate')).stdout).toBe('The database is up to date.\n');
     });
 
@@ -125,7 +125,7 @@ describe('the pingpong CLI', () => {
     it('checks the installation', async () => {
         const before = await run('doctor');
         expect(before.code).toBe(EXIT.failure);
-        expect(before.stdout).toMatch(/FAIL {2}migrations: 1 pending/);
+        expect(before.stdout).toMatch(/FAIL {2}migrations: 2 pending/);
         await run('migrate');
         await run('projects', 'create', 'app');
         const after = await run('doctor');
@@ -135,6 +135,41 @@ describe('the pingpong CLI', () => {
         expect((await run('doctor')).stdout).toMatch(
             /FAIL {2}secret key: it can't decrypt the secrets of app/,
         );
+    });
+
+    it('shows the usage per project, with its share', async () => {
+        await run('migrate');
+        expect((await run('usage')).stdout).toMatch(/No usage in this period/);
+        const database = createDatabase(env['PINGPONG_DATABASE_URL'] ?? '');
+        const today = new Date().toISOString().slice(0, 10);
+        for (const [project, messages, minutes] of [
+            ['app', 300, 120],
+            ['other', 100, 360],
+        ] as const) {
+            await database.kysely
+                .insertInto('usage')
+                .values({
+                    project_id: project,
+                    day: today,
+                    messages,
+                    bytes: messages * 10,
+                    connection_minutes: minutes,
+                    peak_connections: 4,
+                    connections_refused: 0,
+                    rate_limited: 0,
+                })
+                .execute();
+        }
+        await database.close();
+        const { stdout, code } = await run('usage', '--days', '7');
+        expect(code).toBe(EXIT.ok);
+        expect(stdout).toMatch(/^app\t300\t3000\t2\.0\t4\t0\t0\t75\.0%\t25\.0%$/m);
+        expect(stdout).toMatch(/^other\t100\t1000\t6\.0\t4\t0\t0\t25\.0%\t75\.0%$/m);
+        const json = JSON.parse((await run('usage', '--project', 'other', '--json')).stdout) as {
+            lines: { project: string }[];
+        };
+        expect(json.lines.map(({ project }) => project)).toEqual(['other']);
+        expect((await run('usage', '--days', '0')).code).toBe(EXIT.usage);
     });
 });
 

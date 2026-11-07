@@ -34,6 +34,10 @@ Then the same with `serve` (the default command), with `-p 3000:3000`. `projects
 | `PINGPONG_MAX_CHANNELS_PER_SOCKET`                | `100`             |                                                                                                   |
 | `PINGPONG_TRUST_PROXY`                            | `false`           | Trust `X-Forwarded-*` from a reverse proxy                                                        |
 | `PINGPONG_LOG_LEVEL`                              | `info`            | `fatal`, `error`, `warn`, `info`, `debug`, `trace`                                                |
+| `PINGPONG_USAGE_FLUSH_INTERVAL`                   | `60000`           | Milliseconds between two writes of usage to the database                                          |
+| `PINGPONG_USAGE_RETENTION`                        | `400`             | UTC days of usage kept, today included                                                            |
+| `PINGPONG_METRICS_PORT`                           | none              | Serves `/metrics` for Prometheus on this port, apart from the API                                 |
+| `PINGPONG_METRICS_HOST`                           | `127.0.0.1`       | The address of `/metrics`                                                                         |
 
 ## Projects
 
@@ -67,6 +71,32 @@ The live numbers are those of the server that answers, since it started: connect
 With the admin token, the server also serves the operations dashboard at `/dashboard/`: the server's checks and live numbers, and the projects, which it creates, changes, disables, deletes and gives a new secret, showing a secret only once. Operators sign in by pasting the admin token, which stays in the browser tab's `sessionStorage` until they close it or log out, and is sent as a bearer token, never as a cookie. It speaks English and French, after the browser's language. `PINGPONG_DASHBOARD=false` turns it off.
 
 The dashboard is served from the same origin as the admin API, with a strict Content Security Policy: its own scripts, styles and images only, and requests to its own origin.
+
+## Usage
+
+Pingpong keeps what each project used per UTC day in its database (decision 0010): messages and their bytes, connection minutes (its connected sockets added up minute by minute, to split a server's cost), the peak of connections, refused connections and publish requests over the rate limit. Every server adds what it counted to the day's rows every `PINGPONG_USAGE_FLUSH_INTERVAL`, and once more when it stops: several servers add to the same rows, and today is up to a minute behind. With several servers, the peak is the highest one server saw, not the peak of their sum.
+
+```bash
+pingpong usage                       # the last 30 days, per project, with each one's share
+pingpong usage --days 7 --project my-app --json
+```
+
+The admin API answers the same at `GET /admin/v1/usage`, and the dashboard has a Usage page. Rows older than `PINGPONG_USAGE_RETENTION` days are deleted once a day. A project's usage is kept when the project is deleted, under its id: a project created again with the same id adds to it.
+
+## Metrics
+
+With `PINGPONG_METRICS_PORT`, each server serves `/metrics` for Prometheus on a listener of its own, on `127.0.0.1` unless `PINGPONG_METRICS_HOST` says otherwise: a reverse proxy in front of the API never exposes it, and it needs no token. Each metric is labelled with its project; only projects in the database are labels.
+
+| Metric                                                                      | What it is                                                                                                       |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `pingpong_connections{project}`                                             | Sockets connected now, on this server                                                                            |
+| `pingpong_channels{project}`                                                | Channels with at least one subscriber now, on this server                                                        |
+| `pingpong_messages_total{project}`, `pingpong_message_bytes_total{project}` | Messages published (one per channel) and their bytes                                                             |
+| `pingpong_connections_refused_total{project,reason}`                        | Connections refused, by reason (`invalid_key`, `origin_not_allowed`, `project_disabled`, `too_many_connections`) |
+| `pingpong_rate_limited_total{project}`                                      | Publish requests over the project's limit of messages per second                                                 |
+| `pingpong_process_*`, `pingpong_nodejs_*`                                   | Node's own metrics                                                                                               |
+
+Alerts to start with: `pingpong_connections` near a project's limit; `pingpong_rate_limited_total` that increases (an application publishes faster than its limit); `pingpong_connections_refused_total{reason="origin_not_allowed"}` that increases after a deployment (a domain missing from the origins); `/health` that answers `503`.
 
 ## Keeping the admin API to the operators
 

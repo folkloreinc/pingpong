@@ -11,6 +11,7 @@ export PINGPONG_ADMIN_TOKEN=smoke-test-admin-token-0123456789abcdef
 pingpong migrate
 pingpong projects create smoke --origin https://example.com > /dev/null
 pingpong doctor
+pingpong usage > /dev/null
 pingpong serve &
 server=$!
 

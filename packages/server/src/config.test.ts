@@ -69,3 +69,18 @@ describe('the admin token', () => {
         ).toThrow(ConfigError);
     });
 });
+
+describe('usage and metrics', () => {
+    it('flush every minute, keep 400 days, and serve no metrics by default', () => {
+        expect(loadConfig(base)).toMatchObject({
+            usageFlushInterval: 60_000,
+            usageRetention: 400,
+            metricsPort: undefined,
+            metricsHost: '127.0.0.1',
+        });
+        expect(
+            loadConfig({ ...base, PINGPONG_METRICS_PORT: '9464', PINGPONG_USAGE_RETENTION: '90' }),
+        ).toMatchObject({ metricsPort: 9464, usageRetention: 90 });
+        expect(() => loadConfig({ ...base, PINGPONG_USAGE_RETENTION: '0' })).toThrow(ConfigError);
+    });
+});
