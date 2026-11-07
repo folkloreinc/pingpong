@@ -8,6 +8,7 @@ import type {
     AdminProjectPatch,
     AdminProjectSecret,
     LimitsPatch,
+    UsageReport,
 } from '@pingpong-io/protocol';
 
 import type { ResourceHandler } from '../adapter/adapter.ts';
@@ -16,7 +17,7 @@ import { LIMITS } from '../definition.ts';
 import { forEachItem, pageOf, selectedIds } from './paging.ts';
 
 /** A project as an item: its own limits are fields, empty for the server's defaults. */
-export function projectItem(project: AdminProject): Item {
+export function projectItem(project: AdminProject, messages30?: number): Item {
     return {
         id: project.id,
         // The form starts over from the saved values when the project changes. Pingpong has no
@@ -38,6 +39,8 @@ export function projectItem(project: AdminProject): Item {
         peakConnections: project.stats.peakConnections,
         messages: project.stats.messages,
         rateLimited: project.stats.rateLimited,
+        // Kept usage over the last 30 days, in the list only
+        ...(messages30 === undefined ? {} : { messages30 }),
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
         // For the components of its page: the limits that apply, its secret's grace and its stats.
@@ -88,8 +91,18 @@ const path = (project: string) => `/projects/${encodeURIComponent(project)}`;
 
 export const projects: ResourceHandler = {
     async list(query, { client, signal }) {
-        const { projects: list } = await client.request<AdminProjectList>('/projects', { signal });
-        return pageOf(list.map(projectItem), query);
+        const [{ projects: list }, usage] = await Promise.all([
+            client.request<AdminProjectList>('/projects', { signal }),
+            client.request<UsageReport>('/usage', { query: { days: 30 }, signal }),
+        ]);
+        const messages = new Map<string, number>();
+        for (const line of usage.lines) {
+            messages.set(line.project, (messages.get(line.project) ?? 0) + line.messages);
+        }
+        return pageOf(
+            list.map((project) => projectItem(project, messages.get(project.id) ?? 0)),
+            query,
+        );
     },
 
     async get(id, { client, signal }) {

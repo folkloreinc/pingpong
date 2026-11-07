@@ -3,6 +3,7 @@ import type { PanneauPlugin } from '@panneau/core';
 import { CodeDisplay } from './components/CodeDisplay.tsx';
 import { catalogs } from './messages/index.ts';
 import { OverviewPage } from './pages/OverviewPage.tsx';
+import { UsagePage } from './pages/UsagePage.tsx';
 import { CreateProject } from './project/CreateProject.tsx';
 import { ProjectLive } from './project/ProjectLive.tsx';
 import { ProjectSecret } from './project/ProjectSecret.tsx';
@@ -13,6 +14,7 @@ export const dashboardPlugin: PanneauPlugin = {
     locales: catalogs,
     pages: {
         'pingpong-overview': OverviewPage,
+        'pingpong-usage': UsagePage,
     },
     actions: {
         'pingpong-create-project': CreateProject,

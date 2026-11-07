@@ -184,6 +184,7 @@ function projectsResource(intl: IntlShape): ResourceInput {
                 count('peakConnections'),
                 count('messages'),
                 count('rateLimited'),
+                count('messages30'),
                 {
                     id: 'createdAt',
                     label: m('projects.fields.createdAt'),
@@ -199,7 +200,7 @@ function projectsResource(intl: IntlShape): ResourceInput {
                     options: status,
                 },
             ],
-            sorts: ['name', 'id', 'connections', 'messages', 'createdAt'],
+            sorts: ['name', 'id', 'connections', 'messages', 'messages30', 'createdAt'],
             defaultSort: 'name',
             search: true,
             perPage: 50,
@@ -239,9 +240,13 @@ export function createDefinition({
         pages: {
             // The overview is the home: the sidebar's first link.
             home: { component: 'pingpong-overview', label: t(intl, 'overview.title') },
+            usage: { component: 'pingpong-usage', label: t(intl, 'usage.title') },
         },
         menus: {
-            main: [{ type: 'resource', resource: 'projects' }],
+            main: [
+                { type: 'resource', resource: 'projects' },
+                { type: 'page', page: 'usage', icon: 'chart-line' },
+            ],
         },
         auth: createAuth(intl),
         search: { enabled: false },

@@ -124,6 +124,38 @@ export const en = {
     'overview.byProject': 'Projects',
     'overview.project': 'Project',
     'overview.loadError': 'The status couldn’t be read: {message}',
+
+    'projects.fields.messages30': 'Messages, 30 days',
+    'usage.title': 'Usage',
+    'usage.intro':
+        'What each project used per UTC day, kept in the database by every server, up to a minute behind.',
+    'usage.export': 'Export as CSV',
+    'usage.period': 'Period',
+    'usage.period.last7': 'The last 7 days',
+    'usage.period.last30': 'The last 30 days',
+    'usage.measure': 'Chart and order',
+    'usage.measure.connectionMinutes': 'Connection time',
+    'usage.measure.messages': 'Messages',
+    'usage.cost': 'Monthly cost of the server',
+    'usage.costHelp': 'Split by connection time. Kept in this browser only.',
+    'usage.loadError': 'The usage couldn’t be read: {message}',
+    'usage.perDay.connectionMinutes': 'Connection time per day',
+    'usage.perDay.messages': 'Messages per day',
+    'usage.perProject': 'Per project',
+    'usage.empty': 'No usage in this period.',
+    'usage.columns.project': 'Project',
+    'usage.columns.messages': 'Messages',
+    'usage.columns.bytes': 'Bytes',
+    'usage.columns.connectionTime': 'Connection time',
+    'usage.columns.peak': 'Peak',
+    'usage.columns.refused': 'Refused',
+    'usage.columns.rateLimited': 'Over the rate limit',
+    'usage.columns.shareOfMessages': 'Share of messages',
+    'usage.columns.shareOfTime': 'Share of time',
+    'usage.columns.cost': 'Cost',
+    'usage.total': 'Total',
+    'usage.note':
+        'Connection time adds up the connected sockets minute by minute. The peak is the highest one server saw. A deleted project’s usage shows under its id.',
 } as const;
 
 export type MessageId = keyof typeof en;
