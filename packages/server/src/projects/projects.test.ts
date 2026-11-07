@@ -131,4 +131,17 @@ describe('ProjectCache', () => {
         cache.invalidate(project);
         expect((await cache.findByKey(project.key))?.name).toBe('Renamed');
     });
+
+    it('keeps a bounded number of entries, whatever ids and keys are tried', async () => {
+        const projects = new Projects(database, key, defaults);
+        const cache = new ProjectCache(projects, 60_000, { maxEntries: 5 });
+        const { project } = await projects.create('app');
+        for (let index = 0; index < 50; index += 1) {
+            expect(await cache.find(`missing-${index}`)).toBeUndefined();
+            expect(await cache.findByKey(`pk_missing${index}`)).toBeUndefined();
+        }
+        expect(cache.size).toBeLessThanOrEqual(10);
+        expect((await cache.find('app'))?.key).toBe(project.key);
+        expect((await cache.findByKey(project.key))?.id).toBe('app');
+    });
 });

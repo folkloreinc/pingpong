@@ -81,6 +81,26 @@ describe('Socket.IO', () => {
             expect(await refused(server.connect(app, undefined, options))).toBe('project_disabled');
         });
 
+        it("keep no namespace for a project that doesn't exist", async () => {
+            const namespaces = () => [...server.server.realtime.io._nsps.keys()].sort();
+            const before = namespaces();
+            const attempts = Array.from({ length: 20 }, (_, index) =>
+                connected(
+                    server.connect(`missing-${index}`, 'pk_unknown', { reconnection: false }),
+                ).then(
+                    () => null,
+                    (reason: Error) => reason.message,
+                ),
+            );
+            expect(new Set(await Promise.all(attempts))).toEqual(new Set(['unknown_project']));
+            expect(namespaces()).toEqual(before);
+
+            // A project created after a refused attempt gets its namespace back.
+            const late = await server.createProject('missing-0');
+            await connected(server.connect(late));
+            expect(namespaces()).toContain('/projects/missing-0');
+        });
+
         it("stop at the project's limit of connections", async () => {
             await server.server.projects.update('app', { limits: { maxConnections: 1 } });
             await connected(server.connect(app));

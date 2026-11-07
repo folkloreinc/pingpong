@@ -11,6 +11,7 @@ import type { SocketSubscriptionCount } from '@pingpong-io/protocol';
 export class SubscriptionCounts {
     readonly #dirty = new Map<Namespace, Set<string>>();
     readonly #sent = new Map<Namespace, Map<string, number>>();
+    readonly #listeners = new Map<Namespace, (room: string, socketId: string) => void>();
     readonly #timer: NodeJS.Timeout;
 
     constructor(interval: number) {
@@ -34,6 +35,19 @@ export class SubscriptionCounts {
         };
         namespace.adapter.on('join-room', mark);
         namespace.adapter.on('leave-room', mark);
+        this.#listeners.set(namespace, mark);
+    }
+
+    /** Stops following a namespace that was closed. */
+    untrack(namespace: Namespace): void {
+        const mark = this.#listeners.get(namespace);
+        if (mark !== undefined) {
+            namespace.adapter.off('join-room', mark);
+            namespace.adapter.off('leave-room', mark);
+        }
+        this.#listeners.delete(namespace);
+        this.#dirty.delete(namespace);
+        this.#sent.delete(namespace);
     }
 
     /** The number of sockets of this server subscribed to a channel. */
