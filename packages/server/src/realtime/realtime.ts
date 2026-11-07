@@ -59,6 +59,10 @@ export class Realtime {
     readonly stats = new ProjectStats();
     readonly #projects: ProjectCache;
     readonly #counts: SubscriptionCounts;
+    /** The parent of the projects' namespaces. */
+    readonly #parent: Namespace;
+    /** The connections being authorized, by namespace. */
+    readonly #authorizing = new Map<Namespace, number>();
 
     constructor(httpServer: HttpServer, projects: ProjectCache, options: RealtimeOptions) {
         this.#projects = projects;
@@ -80,14 +84,34 @@ export class Realtime {
         // Clients only connect to a project's namespace.
         this.io.of('/').use((_socket, next) => next(refuse('unknown_project')));
 
-        const namespaces = this.io.of(PROJECT_NAMESPACE);
-        namespaces.use((socket, next) => {
+        this.#parent = this.io.of(PROJECT_NAMESPACE);
+        this.#parent.use((socket, next) => {
+            const namespace = socket.nsp;
+            this.#authorizing.set(namespace, (this.#authorizing.get(namespace) ?? 0) + 1);
+            const done = () => {
+                const count = (this.#authorizing.get(namespace) ?? 1) - 1;
+                if (count > 0) {
+                    this.#authorizing.set(namespace, count);
+                } else {
+                    this.#authorizing.delete(namespace);
+                }
+            };
             this.#authorize(socket).then(
-                () => next(),
-                (error: unknown) => next(error instanceof Error ? error : new Error(String(error))),
+                () => {
+                    done();
+                    next();
+                },
+                (error: unknown) => {
+                    done();
+                    const refusal = error instanceof Error ? error : new Error(String(error));
+                    if (refusal.message === 'unknown_project') {
+                        this.#closeUnused(namespace);
+                    }
+                    next(refusal);
+                },
             );
         });
-        namespaces.on('connection', (socket) => this.#onConnection(socket));
+        this.#parent.on('connection', (socket) => this.#onConnection(socket));
         this.io.on('new_namespace', (namespace: Namespace) => {
             if (PROJECT_NAMESPACE.test(namespace.name)) {
                 this.#counts.track(namespace);
@@ -107,6 +131,23 @@ export class Realtime {
             this.stats.refused(projectId, reason);
             throw refuse(reason);
         }
+    }
+
+    /**
+     * Closes the namespace of a project that doesn't exist, which Socket.IO opened for the attempt
+     * before the middleware refused it: any id can be tried, and each would keep a namespace for
+     * good. A namespace with a socket, or a connection being authorized, stays.
+     */
+    #closeUnused(namespace: Namespace): void {
+        if (namespace.sockets.size > 0 || this.#authorizing.has(namespace)) {
+            return;
+        }
+        this.#counts.untrack(namespace);
+        void namespace.adapter.close();
+        this.io._nsps.delete(namespace.name);
+        // Socket.IO's own cleanup of empty child namespaces (`cleanupEmptyChildNamespaces`) does the
+        // same, but only when a connected socket leaves.
+        (this.#parent as unknown as { children: Set<Namespace> }).children.delete(namespace);
     }
 
     #refusal(socket: Socket, project: Project): SocketConnectError | undefined {
