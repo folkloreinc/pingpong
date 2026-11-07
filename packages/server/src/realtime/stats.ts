@@ -16,6 +16,8 @@ export interface ProjectCounters {
 export class ProjectStats {
     readonly since: Date;
     readonly #projects = new Map<string, ProjectCounters>();
+    /** The most sockets connected at once since the last `takePeak()`, by project. */
+    readonly #windowPeaks = new Map<string, number>();
 
     constructor(now = new Date()) {
         this.since = now;
@@ -42,9 +44,30 @@ export class ProjectStats {
         return { ...counters, connectionsRefused: { ...counters.connectionsRefused } };
     }
 
+    /** A copy of a project's counters, or `undefined` for a project nothing happened to. */
+    peek(projectId: string): ProjectCounters | undefined {
+        return this.#projects.has(projectId) ? this.get(projectId) : undefined;
+    }
+
+    /** The projects that have counters. */
+    projectIds(): string[] {
+        return [...this.#projects.keys()];
+    }
+
     connected(projectId: string, connections: number): void {
         const counters = this.#counters(projectId);
         counters.peakConnections = Math.max(counters.peakConnections, connections);
+        this.#windowPeaks.set(
+            projectId,
+            Math.max(this.#windowPeaks.get(projectId) ?? 0, connections),
+        );
+    }
+
+    /** The most sockets connected at once since the last call, for usage (decision 0010). */
+    takePeak(projectId: string): number {
+        const peak = this.#windowPeaks.get(projectId) ?? 0;
+        this.#windowPeaks.delete(projectId);
+        return peak;
     }
 
     refused(projectId: string, reason: SocketConnectError): void {
@@ -65,5 +88,6 @@ export class ProjectStats {
     /** Forgets a deleted project. */
     forget(projectId: string): void {
         this.#projects.delete(projectId);
+        this.#windowPeaks.delete(projectId);
     }
 }

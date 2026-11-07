@@ -18,6 +18,7 @@ import type { Database } from '../database/connection.ts';
 import type { ProjectCache } from '../projects/cache.ts';
 import type { Project, Projects } from '../projects/projects.ts';
 import type { Realtime } from '../realtime/realtime.ts';
+import { MAX_USAGE_DAYS, usageReport } from '../usage/usage.ts';
 import { VERSION } from '../version.ts';
 import { HttpProblem } from './problem.ts';
 
@@ -121,6 +122,32 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
             connections: projectIds.reduce((total, id) => total + realtime.connections(id), 0),
             channels: projectIds.reduce((total, id) => total + realtime.channels(id).length, 0),
         };
+        return reply.send(body);
+    });
+
+    app.get('/usage', async (request, reply) => {
+        const query = request.query as Record<string, unknown>;
+        const days =
+            query['days'] === undefined || query['days'] === '' ? 30 : Number(query['days']);
+        const errors: { pointer: string; message: string }[] = [];
+        if (!Number.isInteger(days) || days < 1 || days > MAX_USAGE_DAYS) {
+            errors.push({
+                pointer: '/days',
+                message: `must be an integer from 1 to ${MAX_USAGE_DAYS}`,
+            });
+        }
+        const project = query['project'];
+        if (project !== undefined && !validate('ProjectId', project).valid) {
+            errors.push({ pointer: '/project', message: 'must be a project id' });
+        }
+        if (errors.length > 0) {
+            throw invalid(errors);
+        }
+        // A deleted project's usage is kept (decision 0010): the id needn't exist.
+        const body = await usageReport(database, {
+            days,
+            projectId: typeof project === 'string' ? project : undefined,
+        });
         return reply.send(body);
     });
 

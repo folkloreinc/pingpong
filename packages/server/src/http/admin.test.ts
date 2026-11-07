@@ -12,6 +12,7 @@ import type {
     Problem,
     ServerStatus,
     SocketSubscribeResult,
+    UsageReport,
 } from '@pingpong-io/protocol';
 import { signRequest } from '@pingpong-io/protocol/signatures';
 
@@ -366,6 +367,31 @@ describe('the admin API', () => {
                 ['secretKey', 'ok'],
                 ['redis', 'skipped'],
             ]);
+        });
+    });
+
+    describe('usage', () => {
+        it('gives the lines per project and day, kept in the database', async () => {
+            await server.request(app, 'POST', '/v1/messages', { channels: ['a'], event: 'e' });
+            await server.server.usage.flush();
+            const response = await admin('GET', '/usage?days=7');
+            expect(response.headers.get('cache-control')).toBe('no-store');
+            const body = (await response.json()) as UsageReport;
+            expect(validate('UsageReport', body)).toMatchObject({ valid: true });
+            expect(body.lines).toMatchObject([{ project: 'app', messages: 1 }]);
+            expect(Date.parse(body.until) - Date.parse(body.since)).toBe(6 * 86_400_000);
+
+            const other = (await (
+                await admin('GET', '/usage?project=deleted-long-ago')
+            ).json()) as UsageReport;
+            expect(other.lines).toEqual([]);
+        });
+
+        it('refuses a period out of bounds and a bad project id', async () => {
+            for (const query of ['days=0', 'days=401', 'days=abc', 'project=Not%20an%20id']) {
+                expect((await admin('GET', `/usage?${query}`)).status, query).toBe(422);
+            }
+            expect((await admin('GET', '/usage', undefined, 'b'.repeat(64))).status).toBe(401);
         });
     });
 

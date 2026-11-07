@@ -2,7 +2,7 @@ import { createDatabase } from './connection.ts';
 import type { Database } from './connection.ts';
 import { MIGRATION_LOCK_TABLE, MIGRATION_TABLE, migrateToLatest } from './migrate.ts';
 
-const TABLES_TO_DROP = ['projects', MIGRATION_TABLE, MIGRATION_LOCK_TABLE];
+const TABLES_TO_DROP = ['usage', 'projects', MIGRATION_TABLE, MIGRATION_LOCK_TABLE];
 
 /**
  * The database tests run on: `PINGPONG_TEST_DATABASE_URL` when it's set (CI runs PostgreSQL),

@@ -25,6 +25,13 @@ export interface Config {
     adminToken: string | undefined;
     /** Serves the dashboard at `/dashboard/` with the admin API: `PINGPONG_DASHBOARD=false` turns it off. */
     dashboard: boolean;
+    /** How often usage goes to the database, in milliseconds (decision 0010). */
+    usageFlushInterval: number;
+    /** How many UTC days of usage are kept, today included. */
+    usageRetention: number;
+    /** `/metrics` for Prometheus, on a listener of its own: off without a port (decision 0010). */
+    metricsPort: number | undefined;
+    metricsHost: string;
     /** Whether to trust `X-Forwarded-*` headers from a reverse proxy. */
     trustProxy: boolean;
     logLevel: string;
@@ -123,6 +130,13 @@ export function loadConfig(env: Env): Config {
         adminToken: parseAdminToken(env['PINGPONG_ADMIN_TOKEN']),
         dashboard:
             env['PINGPONG_DASHBOARD'] === undefined ? true : boolean(env, 'PINGPONG_DASHBOARD'),
+        usageFlushInterval: integer(env, 'PINGPONG_USAGE_FLUSH_INTERVAL', 60_000, 1000),
+        usageRetention: integer(env, 'PINGPONG_USAGE_RETENTION', 400, 1),
+        metricsPort:
+            env['PINGPONG_METRICS_PORT'] === undefined || env['PINGPONG_METRICS_PORT'] === ''
+                ? undefined
+                : integer(env, 'PINGPONG_METRICS_PORT', 0),
+        metricsHost: env['PINGPONG_METRICS_HOST'] || '127.0.0.1',
         trustProxy: boolean(env, 'PINGPONG_TRUST_PROXY'),
         logLevel: env['PINGPONG_LOG_LEVEL'] || 'info',
     };

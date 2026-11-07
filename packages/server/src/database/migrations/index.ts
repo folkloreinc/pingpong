@@ -2,6 +2,7 @@ import type { Migration } from 'kysely/migration';
 
 import type { Dialect } from '../connection.ts';
 import { projects } from './0001-projects.ts';
+import { usage } from './0002-usage.ts';
 
 /**
  * Every migration, in order. A migration is never changed once released: changes to the schema
@@ -10,5 +11,6 @@ import { projects } from './0001-projects.ts';
 export function migrations(dialect: Dialect): Record<string, Migration> {
     return {
         '0001-projects': projects(dialect),
+        '0002-usage': usage(),
     };
 }

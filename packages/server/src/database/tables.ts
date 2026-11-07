@@ -28,6 +28,23 @@ export interface ProjectsTable {
     disabled_at: NullableTimestamp;
 }
 
+/** A count: `bigint` comes back as text from PostgreSQL. */
+type Count = ColumnType<number | string | bigint, number, number>;
+
+/** Usage per project and UTC day (decision 0010), added to by every server. */
+export interface UsageTable {
+    project_id: string;
+    /** The UTC day, `YYYY-MM-DD`. */
+    day: string;
+    messages: Count;
+    bytes: Count;
+    connection_minutes: Count;
+    peak_connections: Count;
+    connections_refused: Count;
+    rate_limited: Count;
+}
+
 export interface Tables {
     projects: ProjectsTable;
+    usage: UsageTable;
 }
