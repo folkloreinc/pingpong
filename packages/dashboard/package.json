@@ -1,6 +1,6 @@
 {
     "name": "@pingpong-io/dashboard",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "Pingpong's operations dashboard: a Panneau 5 app on the admin API",
     "type": "module",
     "license": "MIT",
@@ -35,7 +35,7 @@
         "@panneau/lists": "5.0.0-alpha.31",
         "@panneau/protocol": "5.0.0-alpha.31",
         "@panneau/ui": "5.0.0-alpha.31",
-        "@pingpong-io/protocol": "^0.3.0",
+        "@pingpong-io/protocol": "^0.3.1",
         "@tanstack/react-query": "^5.104.3",
         "@types/react": "^19.2.0",
         "@types/react-dom": "^19.2.0",
