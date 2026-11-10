@@ -6,7 +6,7 @@
 //
 // CONNECTIONS (10000), CHANNELS (100), RATE (200 messages per second), RAMP (2m) and HOLD (5m) tune it.
 // ORIGIN sends an Origin header, for a project that checks its origins.
-import { check } from 'k6';
+import { check, sleep } from 'k6';
 import crypto from 'k6/crypto';
 /* global __ENV, __VU */
 import http from 'k6/http';
@@ -121,6 +121,9 @@ export function subscriber() {
         );
     });
     check(res, { 'websocket upgraded': (r) => r && r.status === 101 });
+    // The connection failed or was dropped: wait before the next one, as a client would, instead of
+    // reconnecting at once and exhausting the local ports.
+    sleep(1 + Math.random() * 4);
 }
 
 export function publisher() {
