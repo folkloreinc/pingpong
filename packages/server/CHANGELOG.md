@@ -1,5 +1,13 @@
 # @pingpong-io/server
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [c7947fe]
+  - @pingpong-io/dashboard@0.3.1
+  - @pingpong-io/protocol@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes
