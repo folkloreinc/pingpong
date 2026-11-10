@@ -30,3 +30,4 @@ Clients connect from one address: behind Cloudflare, its protection may slow or 
 ## Results
 
 - 2026-11-10, local (MacBook, server and k6 on the same machine, SQLite): 10,000 connections, 200 messages per second for 60 s to 100 channels, 1.2 million deliveries. All connections and publications succeeded, no connection dropped; delivery p95 3 ms, max 145 ms.
+- 2026-11-10, rehearsal on `pingpong.urbania.ca` from Montréal, through Cloudflare, without a transcoding: 1,000 connections from one address, 20 messages per second for 2 minutes to 100 channels. All connections and publications succeeded, no connection dropped, 23,997 deliveries of 24,000 (the last ones cut off by the end of the test); delivery p95 71 ms, max 718 ms; WebSocket connection p95 168 ms. Cloudflare didn't slow the connections.
